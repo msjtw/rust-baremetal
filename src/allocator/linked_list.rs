@@ -71,7 +71,7 @@ impl LinkedList {
             }
         };
 
-        let hole = HoleInfo {
+        let mut hole = HoleInfo {
             ptr: ptr as *mut Hole,
             size: layout.size(),
         };
@@ -82,14 +82,29 @@ impl LinkedList {
                     if hole.ptr < next.as_ptr() {
                         unsafe {
                             // found spot for new hole
+                            let mut next_ptr = cursor.curr().next;
+                            // check if we can merge
+                            // with previous
+                            match merge(&HoleInfo::from(cursor.prev), &hole) {
+                                Some(x) => {
+                                    hole = x;
+                                }
+                                None => {}
+                            };
+                            // with next
+                            match merge(&hole, &HoleInfo::from(next)) {
+                                Some(x) => {
+                                    next_ptr = next.as_ref().next;
+                                    hole = x;
+                                }
+                                None => {}
+                            }
+
                             cursor.prev.as_mut().next = Some(NonNull::new_unchecked(hole.ptr));
                             hole.ptr.write(Hole {
                                 size: hole.size,
-                                next: cursor.curr().next,
+                                next: next_ptr,
                             });
-                            // now we can mere holes
-                            // with prevoius
-                            if cursor.prev.add(count)
                             break;
                         }
                     } else {
@@ -104,12 +119,12 @@ impl LinkedList {
                         next: None,
                     });
                     break;
-                }
+                },
             }
         }
     }
 
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         LinkedList {
             head: Hole {
                 size: 0,
@@ -119,13 +134,11 @@ impl LinkedList {
     }
 
     pub fn init(&mut self, addr: *mut u8, size: usize) {
-        align_of::<Hole>();
-
         let hole = Hole {
             size: size,
             next: None,
         };
-        let ptr = addr as *mut Hole;
+        let ptr = align_up(addr, align_of::<Hole>()) as *mut Hole;
         unsafe { ptr.write(hole) };
         self.head.next = NonNull::new(ptr);
     }
@@ -238,6 +251,15 @@ impl Cursor {
     }
 }
 
+impl From<NonNull<Hole>> for HoleInfo {
+    fn from(value: NonNull<Hole>) -> Self {
+        HoleInfo {
+            ptr: value.as_ptr(),
+            size: unsafe { value.as_ref().size },
+        }
+    }
+}
+
 fn align_up(ptr: *mut u8, align: usize) -> *mut u8 {
     let offset = ptr.align_offset(align);
     ptr.wrapping_add(offset)
@@ -250,3 +272,20 @@ fn align_to_min(layout: Layout) -> Result<Layout, core::alloc::LayoutError> {
         Err(x) => Err(x),
     }
 }
+
+fn merge(hp: &HoleInfo, hn: &HoleInfo) -> Option<HoleInfo> {
+    // if hp is root, we cant merge with it
+    if hp.size == 0 {
+        return None;
+    }
+    let hp_end = hp.ptr.wrapping_add(hp.size);
+    if hp_end == hn.ptr {
+        return Some(HoleInfo {
+            ptr: hp.ptr,
+            size: hp.size + hn.size,
+        });
+    }
+    None
+}
+
+unsafe impl Sync for Hole {}

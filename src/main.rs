@@ -5,9 +5,9 @@
 extern crate alloc;
 
 mod allocator;
+use allocator::Heap;
 
 use alloc::format;
-use buddy_system_allocator::LockedHeap;
 use core::arch::global_asm;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
@@ -15,7 +15,7 @@ use core::ptr::write_volatile;
 const HEAPSIZE: usize = 0x10000;
 
 #[global_allocator]
-static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
+static mut HEAP_ALLOCATOR: Heap = Heap::empty();
 
 static mut HEAP: [u8; HEAPSIZE] = [0; HEAPSIZE];
 
@@ -39,9 +39,7 @@ pub extern "C" fn main() {
     // SAFETY: `HEAP` is only used here and `entry` is only called once.
     unsafe {
         // Give the allocator some memory to allocate.
-        HEAP_ALLOCATOR
-            .lock()
-            .init(HEAP.as_mut_ptr() as usize, HEAPSIZE);
+        HEAP_ALLOCATOR.init(HEAP.as_mut_ptr(), HEAPSIZE);
     }
 
     // Now we can do things that require heap allocation.
