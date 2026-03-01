@@ -3,8 +3,6 @@
 #![feature(ascii_char)]
 
 extern crate alloc;
-
-mod allocator;
 use allocator::Heap;
 
 use alloc::format;
