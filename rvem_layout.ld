@@ -3,7 +3,7 @@ OUTPUT_ARCH("riscv")
 ENTRY(_entry)
 
 MEMORY {
-  ram (rwx) : ORIGIN = 0x80000000, LENGTH = 4M
+  ram (rwx) : ORIGIN = 0x80200000, LENGTH = 62M
 }
 
 SECTIONS {
@@ -14,13 +14,14 @@ SECTIONS {
   .text : {
     *(.text)
   } > ram
-
-  .data : {
-    *(.data)
-  } > ram
+  PROVIDE(etext = .);
 
   .rodata : {
     *(.rodata)
+  } > ram
+
+  .data : {
+    *(.data)
   } > ram
 
   .bss : {
@@ -29,5 +30,7 @@ SECTIONS {
 
   . = ALIGN(8);
   . = . + 4096;
-  _STACK_PTR = .;
+  PROVIDE(_STACK_PTR = .);
+  . = . + 32;
+  PROVIDE(ekernel = .);
 }

@@ -2,27 +2,21 @@
 macro_rules! read_csr {
     ($csr:ident) => {{
         let value: usize;
-        unsafe {
             core::arch::asm!(
                 concat!("csrrc {0}, ", stringify!($csr), ", x0"),
                 out(reg) value,
             );
-        }
         value
     }};
 }
 
 #[macro_export]
 macro_rules! write_csr {
-    ($csr:ident $val:expr) => {{
-        let value: usize;
-        unsafe {
+    ($csr:ident, $val:expr) => {{
             core::arch::asm!(
                 concat!("csrrw x0, ", stringify!($csr), ", {0}"),
-                in(reg) value,
+                in(reg) $val,
             );
-        }
-        value
     }};
 }
 

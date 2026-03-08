@@ -3,26 +3,31 @@
 #![feature(ascii_char)]
 
 mod csr;
+mod kmemory;
 
 extern crate alloc;
-use allocator::Heap;
-
 use alloc::format;
-use core::arch::{asm, global_asm};
+use buddy_system_allocator::LockedHeap;
+
+use core::arch::global_asm;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
 
 const HEAPSIZE: usize = 0x10000;
 
 #[global_allocator]
-static mut HEAP_ALLOCATOR: Heap = Heap::empty();
+static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::<32>::new();
 
 static mut HEAP: [u8; HEAPSIZE] = [0; HEAPSIZE];
+
+#[unsafe(no_mangle)]
+pub static STACK: [u8; 4096] = [0; 4096];
 
 global_asm!(
     "
     .global _entry
     .extern _STACK_PTR
+    .extern stack
 
     .section .text.boot
 
@@ -45,30 +50,28 @@ fn uart_print(message: &str) {
     }
 }
 
-#[allow(static_mut_refs)] // HEAP.as_mut_ptr() creates a mutable reference to mutable static
+#[allow(static_mut_refs)]
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
     uart_print("Hello, world!\n");
 
-    // SAFETY: `HEAP` is only used here and `entry` is only called once.
     unsafe {
-        // Give the allocator some memory to allocate.
-        HEAP_ALLOCATOR.init(HEAP.as_mut_ptr(), HEAPSIZE);
+        HEAP_ALLOCATOR
+            .lock()
+            .init(HEAP.as_mut_ptr() as usize, HEAPSIZE);
     }
 
-    let x = read_csr!(misa);
-
-    let message = format!("Misa: {:b}\n", x);
-    let temp_str = message.as_str();
-    uart_print(temp_str);
-
-    // Now we can do things that require heap allocation.
-    // for ctr in 1..10 {
-    //     let message = format!("Ticks: {}\n", ctr);
-    //     let temp_str = message.as_str();
-    //     uart_print(temp_str);
-    // }
-
+    let msg = unsafe {
+        format!(
+            "etext: 0x{:x}, ekernel: 0x{:x}, _STACK_PTR: 0x{:x}\n",
+            &kmemory::etext as *const u32 as u32,
+            &kmemory::ekernel as *const u32 as u32,
+            &kmemory::_STACK_PTR as *const u32 as u32
+        )
+    };
+    let tmp = msg.as_str();
+    uart_print(tmp);
+    
     loop {}
 }
 
