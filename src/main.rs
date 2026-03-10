@@ -20,8 +20,8 @@ static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::<32>::new();
 
 static mut HEAP: [u8; HEAPSIZE] = [0; HEAPSIZE];
 
-#[unsafe(no_mangle)]
-pub static STACK: [u8; 4096] = [0; 4096];
+// #[unsafe(no_mangle)]
+// unsafe extern  static STACK: [u8; 4096] = [0; 4096];
 
 global_asm!(
     "
@@ -48,6 +48,12 @@ fn uart_print(message: &str) {
             write_volatile(UART, c);
         }
     }
+}
+
+struct Kernel {
+    memory: kmemory::Kmem,
+    kvm: kmemory::Kvm,
+
 }
 
 #[allow(static_mut_refs)]
