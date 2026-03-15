@@ -1,6 +1,10 @@
+use alloc::format;
+
+use crate::{uart_print, write_csr};
+
 unsafe extern "C" {
-    pub static etext: u8;
-    pub static ekernel: u8;
+    pub static etext: u32;
+    pub static ekernel: u32;
     pub static _STACK_PTR: u32;
 }
 
@@ -9,26 +13,33 @@ const RAMSIZE: usize = 62 * 1024 * 1024;
 const RAMSTART: usize = 0x80000000;
 const RAMEND: usize = RAMSTART + RAMSIZE;
 
-struct PTPage([u32; 1024]); // 4kB page contaning 1024 PTEs
+const KERNEL_START: usize = 0x80200000;
+pub const UART: usize = 0x10000000;
+
+// struct PTPage([u32; 1024]); // 4kB page contaning 1024 PTEs
 
 const LEVELS: u32 = 2;
-const PTESIZE: u32 = 4;
+const PTE_SIZE: usize = 4;
+
+const PTE_R: u32 = 0b10;
+const PTE_W: u32 = 0b100;
+const PTE_X: u32 = 0b1000;
 
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 struct PTE {
-    ppn: u32,
-    ppn1: u32,
-    ppn0: u32,
-    rsw: u8,
-    d: bool,
-    a: bool,
-    g: bool,
-    u: bool,
-    x: bool,
-    w: bool,
-    r: bool,
-    v: bool,
+    pub ppn: u32,
+    pub ppn1: u32,
+    pub ppn0: u32,
+    pub rsw: u8,
+    pub d: bool,
+    pub a: bool,
+    pub g: bool,
+    pub u: bool,
+    pub x: bool,
+    pub w: bool,
+    pub r: bool,
+    pub v: bool,
 }
 
 impl From<u32> for PTE {
@@ -68,29 +79,55 @@ impl Into<u32> for PTE {
 
 #[allow(dead_code)]
 impl PTE {
-    fn set_a(self) -> Self {
-        Self { a: true, ..self }
+    #[inline]
+    fn from_pa(pa: u32) -> PTE {
+        let mask = (1 << 10) - 1;
+        PTE::from(pa & !mask)
     }
-    fn set_d(self) -> Self {
-        Self { d: true, ..self }
+
+    fn set_perm(&mut self, perm: &Perm) {
+        self.r = perm.r;
+        self.w = perm.w;
+        self.x = perm.x;
     }
 }
 
-#[allow(dead_code)]
+struct Perm {
+    r: bool,
+    w: bool,
+    x: bool,
+}
+
+impl Into<u32> for Perm {
+    fn into(self) -> u32 {
+        let mut res = 0;
+        if self.r {
+            res |= 0b10;
+        }
+        if self.w {
+            res |= 0b100;
+        }
+        if self.x {
+            res |= 0b1000;
+        }
+        res
+    }
+}
+
 #[derive(Debug)]
-struct SATP {
-    mode: u8,
+pub struct SATP {
+    mode: u32,
     asid: u32,
     ppn: u32,
 }
 
-impl From<u32> for SATP {
-    fn from(val: u32) -> Self {
-        SATP {
-            mode: ((val & 0b10000000000000000000000000000000) >> 31) as u8,
-            asid: (val & 0b01111111110000000000000000000000) >> 22,
-            ppn: (val & 0b00000000001111111111111111111111),
-        }
+impl Into<u32> for SATP {
+    fn into(self) -> u32 {
+        let mut satp: u32 = 0;
+        satp |= self.mode << 31;
+        satp |= self.asid << 22;
+        satp |= self.ppn;
+        satp
     }
 }
 
@@ -99,6 +136,16 @@ struct VA {
     vpn1: u32,
     vpn0: u32,
     offset: u32,
+}
+
+impl VA {
+    fn vpn(&self, level: u32) -> Option<u32> {
+        match level {
+            0 => Some(self.vpn0),
+            1 => Some(self.vpn1),
+            _ => None,
+        }
+    }
 }
 
 impl From<u32> for VA {
@@ -127,165 +174,144 @@ impl Into<u32> for PA {
 }
 
 pub struct Kmem {
-    freelist: *const u8,
+    freelist: *mut u32,
 }
+
 impl Kmem {
-    pub fn kalloc_init() {
-        let kernel_end = unsafe { &ekernel as *const u8 };
-        let cursor = align_up(kernel_end as usize, PAGESIZE) as *mut u8;
-        while (cursor as usize) < RAMEND {
-            cursor.wrapping_add(PAGESIZE);
+    pub fn kalloc_init() -> Kmem {
+        let kernel_end = unsafe { &ekernel as *const u32 };
+        let mut kmem = Kmem {
+            freelist: kernel_end as *mut u32,
+        };
+        let mut cursor = align_up(kernel_end as usize, PAGESIZE) as *mut u32;
+        while (cursor as usize) < align_down(RAMEND, PAGESIZE) {
+            uart_print(format!("0x{:x} 0x{:x}\n", cursor as u32, RAMEND).as_str());
+            kmem.kfree(cursor);
+            cursor = cursor.wrapping_byte_add(PAGESIZE);
         }
+        kmem
     }
-    pub fn kalloc(&mut self) -> Result<*const u8, ()> {
+    pub fn kalloc(&mut self) -> Result<*mut u32, ()> {
         // TODO: check if out of memory
 
         let head = self.freelist;
-        self.freelist = unsafe { (self.freelist as *const usize).read() as *mut u8 };
+        self.freelist = unsafe { (self.freelist).read() as *mut u32 };
         return Ok(head);
     }
-    pub fn kfree(&mut self, ptr: *const u8) {
+    pub fn kfree(&mut self, ptr: *mut u32) {
         // TODO: check if ptr is correct
 
-        unsafe { (ptr as *mut usize).write(self.freelist as usize) };
+        unsafe { ptr.write(self.freelist as u32) };
         self.freelist = ptr;
     }
 }
 
+#[derive(Default)]
 pub struct Kvm {
-    pagetree: PTPage,
+    pagetree: *mut u32,
 }
 
 impl Kvm {
-    pub fn init(&mut self, memory: &mut Kmem) {
+    pub fn init(memory: &mut Kmem) -> Result<Kvm, ()> {
+        let root_page = memory.kalloc()?;
+        let mut kvm = Kvm {
+            pagetree: root_page,
+        };
         // map all sections
-        self.kvmmap(virt, phys, size, perm);
+
+        // uart
+        kvm.kvmmap(memory, UART, UART, PAGESIZE, PTE_R | PTE_W)?;
+
+        // kernel text
+        let end_text = unsafe { &etext } as *const u32 as usize;
+        kvm.kvmmap(
+            memory,
+            KERNEL_START,
+            KERNEL_START,
+            end_text - KERNEL_START,
+            PTE_X | PTE_W,
+        )?;
+
+        // kernel data and ram after kernel
+        kvm.kvmmap(memory, end_text, end_text, RAMEND - end_text, PTE_R | PTE_W)?;
+        Ok(kvm)
+    }
+
+    pub fn start_kvm(&self) {
+        let ppn = (self.pagetree as u32) >> 12;
+        let satp = SATP {
+            mode: 1,
+            asid: 0,
+            ppn,
+        };
+        let satp: u32 = satp.into();
+        unsafe { write_csr!(satp, satp) };
     }
 
     // Cretae PTEs for translaition virt -> phys
     // continous virt to virt + size to continous phys to phys + size
-    fn kvmmap(&mut self, virt: usize, phys: usize, size: usize, perm: usize) {
+    fn kvmmap(
+        &mut self,
+        memory: &mut Kmem,
+        virt: usize,
+        phys: usize,
+        size: usize,
+        perm: u32,
+    ) -> Result<(), ()> {
         // TODO: tests
         // - size and virt addr aligned on page
         // - size > 0 and end < RAMEND
 
-        let mut addr = virt;
-        let addr_end = virt + size;
-        while addr < addr_end {
-            let pte = walk(self.pagetree, addr);
-            match pte {
-                Ok(pte) => {}
-                Err(_) => {
-                    // coudlnt find
-                }
-            }
-            addr += PAGESIZE;
+        let mut vaddr = virt;
+        let mut paddr = phys;
+        let vaddr_end = virt + size;
+        while vaddr < vaddr_end {
+            let pte_addr = walk(memory, self.pagetree, vaddr, true)?;
+            // NOTE: check for remap (I don't think it's possible)
+
+            let mut pte = PTE::from_pa(paddr as u32);
+            pte.v = true;
+            let mut pte: u32 = pte.into(); // set permissions
+            pte |= perm;
+            unsafe { pte_addr.write(pte) };
+
+            vaddr += PAGESIZE;
+            paddr += PAGESIZE;
         }
+        Ok(())
     }
 }
 
 // returns leaf pte addr for given virtual address
 // with support for megapages
-fn walk(memory: &mut Kmem, pagetree: *const u8, virt_a: u32, alloc: bool) -> Result<*mut PTE, ()> {
-    let va = VA::from(virt_a);
+fn walk(memory: &mut Kmem, pagetree: *mut u32, virt_a: usize, alloc: bool) -> Result<*mut u32, ()> {
+    let va = VA::from(virt_a as u32);
 
-    let mut a = pagetree as *mut u32;
-    let mut i = LEVELS - 1;
+    let mut a = pagetree;
 
-    for i in (0..LEVELS).rev() {
-        let index = va.vpn1;
-        let mut pte_addr = a.with_addr(index as usize);
-        let pte_u32 = unsafe { pte_addr.read() };
+    let index = va.vpn(1).ok_or(())?;
+    let pte_addr = a.wrapping_add(index as usize);
+    let pte_u32 = unsafe { pte_addr.read() };
 
-        let mut pte = PTE::from(pte_u32);
+    let pte = PTE::from(pte_u32);
 
-        if pte.v {
-            a = (pte.ppn << 12) as *mut u32;
-        } else {
-            if !alloc {
-                return Err(());
-            }
-            let new_page = memory.kalloc()?;
-        }
-    }
-
-    // level 1
-
-    if !(pte.r || pte.x) {
-        if pte.d || pte.a || pte.u {
-            return Err(None);
-        }
-        //level 0
-        i -= 1;
-        a = pte.ppn * PAGESIZE;
-        let index = va.vpn0 * PTESIZE;
-        pte_addr = a + index;
-        let pte_m0 = phys_read_word(pte_addr, hart, bus)?;
-        pte = PTE::from(pte_m0);
-        if !pte.v || (!pte.r && pte.w) {
-            // page fault
-            // print!(" mmu5 ");
-            return Err(None);
-        }
-
-        if !(pte.r || pte.x) {
-            // level < 0
-            // page fault
-            // print!(" mmu4 ");
-            return Err(None);
-        }
-
-        if pte.u {
-            //user page
-            if (mode == 1 && mstatus_sum == 0) || mode > 1 {
-                // print!(" mmu3 ");
-                return Err(None);
-            }
-        } else {
-            //supervisor page
-            if mode != 1 {
-                // print!(" mmu2 ");
-                return Err(None);
-            }
-        }
-    }
-
-    // leaf pte has been reached
-    if i > 0 && pte.ppn0 != 0 {
-        // misaligned superpage
-        // print!(" mmu1 ");
-        return Err(None);
-    }
-
-    let pa = PA {
-        ppn1: pte.ppn1,
-        ppn0: if i > 0 { va.vpn0 } else { pte.ppn0 },
-        offset: va.offset,
-    };
-
-    let phys_a: u32 = pa.into();
-
-    let res: (u32, MemoryPermissions);
-    if mstatus_mxr > 0 {
-        // make eXecutable Readable
-        res = (
-            phys_a,
-            MemoryPermissions {
-                r: pte.x,
-                w: pte.w,
-                x: pte.x,
-            },
-        );
+    if pte.v {
+        a = (pte.ppn << 10) as *mut u32;
     } else {
-        res = (
-            phys_a,
-            MemoryPermissions {
-                r: pte.r,
-                w: pte.w,
-                x: pte.x,
-            },
-        );
+        if !alloc {
+            return Err(());
+        }
+        let new_page_addr = memory.kalloc()? as u32;
+        let mut new_pte = PTE::from_pa(new_page_addr);
+        new_pte.v = true;
+        unsafe { pte_addr.write(new_pte.into()) };
+        a = new_page_addr as *mut u32;
     }
+
+    let index = va.vpn(0).ok_or(())?;
+    let pte_addr = a.wrapping_add(index as usize);
+
+    Ok(pte_addr)
 }
 
 fn align_up(val: usize, alignment: usize) -> usize {

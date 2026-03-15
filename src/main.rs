@@ -41,11 +41,10 @@ global_asm!(
 );
 
 fn uart_print(message: &str) {
-    const UART: *mut u8 = 0x10000000 as *mut u8;
-
+    let uart = kmemory::UART as *mut u8;
     for c in message.bytes() {
         unsafe {
-            write_volatile(UART, c);
+            write_volatile(uart, c);
         }
     }
 }
@@ -53,7 +52,6 @@ fn uart_print(message: &str) {
 struct Kernel {
     memory: kmemory::Kmem,
     kvm: kmemory::Kvm,
-
 }
 
 #[allow(static_mut_refs)]
@@ -67,22 +65,34 @@ pub extern "C" fn main() -> ! {
             .init(HEAP.as_mut_ptr() as usize, HEAPSIZE);
     }
 
-    let msg = unsafe {
-        format!(
-            "etext: 0x{:x}, ekernel: 0x{:x}, _STACK_PTR: 0x{:x}\n",
-            &kmemory::etext as *const u32 as u32,
-            &kmemory::ekernel as *const u32 as u32,
-            &kmemory::_STACK_PTR as *const u32 as u32
-        )
-    };
-    let tmp = msg.as_str();
-    uart_print(tmp);
-    
+
+    let mut memory = kmemory::Kmem::kalloc_init();
+    let mut kvm = kmemory::Kvm::init(&mut memory).unwrap();
+
+    let kernel = Kernel { memory, kvm };
+
+    // let msg = unsafe {
+    //     format!(
+    //         "etext: 0x{:x}, ekernel: 0x{:x}, _STACK_PTR: 0x{:x}\n",
+    //         &kmemory::etext as *const u32 as u32,
+    //         &kmemory::ekernel as *const u32 as u32,
+    //         &kmemory::_STACK_PTR as *const u32 as u32
+    //     )
+    // };
+    // let tmp = msg.as_str();
+    // uart_print(tmp);
+
+    kernel.kvm.start_kvm();
+
+    uart_print("Virt started\n");
+
     loop {}
 }
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     uart_print("Something went wrong.\n");
+    let msg = format!("{:?}", _info);
+    uart_print(msg.as_str());
     loop {}
 }

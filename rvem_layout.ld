@@ -14,6 +14,7 @@ SECTIONS {
   .text : {
     *(.text)
   } > ram
+  . = ALIGN(0x1000); 
   PROVIDE(etext = .);
 
   .rodata : {
