@@ -1,7 +1,7 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
     arch::asm,
-    ptr::{NonNull, copy_nonoverlapping},
+    ptr::{NonNull, copy_nonoverlapping}, str::Utf8Error,
 };
 
 use alloc::{alloc::Allocator, string::String, vec::Vec};
@@ -580,10 +580,21 @@ pub fn copy_in_cont<T: Copy>(uv: &mut Uvm, addr: usize, len: usize) -> Result<Ve
     Ok(bytes)
 }
 
-pub fn copy_in_str() -> Result<str, ()> {
-    let s = String::new();
+pub fn copy_in_str(uv: &mut Uvm, addr: usize) -> Result<String, ()> {
+    let mut bytes = Vec::new();
+    let user_addr = walkaddr(&mut uv.pagetree, addr).ok_or(())?;
 
-    Ok(s.as_str())
+    let mut i = 0;
+    loop {
+        let byte = unsafe { (user_addr as *const u8).add(i).read() };
+        bytes.push(byte);
+        if byte == 0 {
+            break;
+        }
+        i += 1;
+    }
+
+    String::from_utf8(bytes).map_err(|_| ())
 }
 
 // copy from current OUT to user
