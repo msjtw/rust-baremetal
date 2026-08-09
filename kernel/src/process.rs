@@ -1,6 +1,10 @@
 pub mod trapframe;
 
-use alloc::{format, vec, vec::Vec};
+use alloc::{
+    format,
+    string::String,
+    vec::{self, Vec},
+};
 use core::{arch::naked_asm, mem::transmute, ptr};
 
 use alloc::boxed::Box;
@@ -18,7 +22,9 @@ use crate::{
         trampoline::{_trampoline, userret, uservec},
         usertrap,
     },
-    virtmemory::{self, PAGESIZE, PTE_R, PTE_W, PTE_X, TRAMPOLINE, USER_START, Uvm, copy_out_cont},
+    virtmemory::{
+        self, PAGESIZE, PTE_R, PTE_W, PTE_X, TRAMPOLINE, USER_START, Uvm, copy_out, copy_out_cont,
+    },
     write_csr,
 };
 
@@ -45,6 +51,7 @@ pub enum ProcState {
     Runnable,
     Running,
     Zombie,
+    Delete,
 }
 
 #[repr(C)]
@@ -98,6 +105,8 @@ pub struct Process {
     pub parent: Option<usize>,
     pub pagetable: virtmemory::Uvm, // user virt pagetable
     pub context: Context,
+    pub xstatus: u32,
+    pub sleep_channel: Option<usize>,
     pub trapframe: Box<Trapframe, &'static FrameAllocator>,
 }
 
@@ -110,6 +119,8 @@ impl Process {
             parent: None,
             pagetable: virtmemory::Uvm::new()?,
             context: Context::default(),
+            xstatus: 0,
+            sleep_channel: None,
             trapframe: Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR),
         })
     }
@@ -152,7 +163,14 @@ impl Process {
         child_proc.pid.ok_or(())
     }
 
-    pub fn kexec(&mut self, img: &[u8], argv: Vec<&str>) -> Result<(), ()> {
+    pub fn kexec(&mut self, path: String, argv: Vec<&str>) -> Result<(), ()> {
+        // TODO: when file sytem is implemented load from filr
+
+        let img: &[u8] = match path.as_str() {
+            "init" => crate::INIT,
+            "prime" => crate::PRIME,
+            _ => panic!("kexec: unknown program"),
+        };
         let mut pagetree = Uvm::new()?;
         pagetree.init_proc(self)?;
         pagetree.alloc(img.len(), PTE_R | PTE_W | PTE_X)?;
@@ -170,7 +188,7 @@ impl Process {
         // TODO: add name as argv[0]
 
         // Copy args to stack
-        let mut ustack = vec![];
+        let mut ustack = Vec::new();
         for arg in &argv {
             sp -= arg.len();
             sp &= !0b111; // sp is aligned to 16 bytes
@@ -201,6 +219,60 @@ impl Process {
         self.trapframe.epc = USER_START;
 
         Ok(())
+    }
+
+    pub fn kexit(&mut self, xstatus: u32) -> ! {
+        if self.pid == Some(1) {
+            panic!("init exit");
+        }
+
+        // TODO: close all open files
+
+        // giveup childer to init
+        KERNEL.get().unwrap().lock().reparent(self.pid);
+
+        // wakeup parent
+        KERNEL.get().unwrap().lock().wakeup(self.parent);
+
+        self.xstatus = xstatus;
+        self.state = ProcState::Zombie;
+
+        unsafe { self.sched() };
+        panic!("cordyceps")
+    }
+
+    pub fn kwait(&mut self, status_addr: usize) -> i32 {
+        loop {
+            let mut has_kids = false;
+
+            for proc in &mut KERNEL.get().unwrap().lock().process_table {
+                if proc.parent == self.pid {
+                    has_kids = true;
+                    if proc.state == ProcState::Zombie {
+                        if status_addr != 0 {
+                            copy_out(&mut self.pagetable, status_addr, proc.xstatus).unwrap();
+                        }
+                        proc.state = ProcState::Delete;
+                        return proc.pid.unwrap() as i32;
+                    }
+                }
+            }
+
+            if !has_kids {
+                return -1;
+            }
+
+            self.sleep(self.pid);
+        }
+    }
+
+    fn sleep(&mut self, channel: Option<usize>) {
+        self.sleep_channel = channel;
+        self.state = ProcState::Sleeping;
+
+        unsafe { self.sched() };
+
+        self.sleep_channel = None
     }
 }
 
@@ -251,16 +323,19 @@ pub fn scheduler() -> ! {
             interrupt_off();
         }
 
-        for proc in KERNEL.get().unwrap().lock().process_table.iter_mut() {
-            if proc.state == ProcState::Runnable {
-                proc.state = ProcState::Running;
-                print!("Swiching to process {:?}\n", proc.pid);
-                print!("stack pointer 0x{:x}\n", proc.trapframe.sp);
-                unsafe {
-                    crate::CPU.current = proc as *mut Process;
-                    switch(&mut crate::CPU.context, &mut proc.context);
-                    crate::CPU.current = ptr::null_mut();
+        for proc in &mut KERNEL.get().unwrap().lock().process_table {
+            match proc.state {
+                ProcState::Runnable => {
+                    proc.state = ProcState::Running;
+                    print!("Swiching to process {:?}\n", proc.pid);
+                    print!("stack pointer 0x{:x}\n", proc.trapframe.sp);
+                    unsafe {
+                        crate::CPU.current = proc as *mut Process;
+                        switch(&mut crate::CPU.context, &mut proc.context);
+                        crate::CPU.current = ptr::null_mut();
+                    }
                 }
+                _ => {}
             }
         }
     }
@@ -269,9 +344,7 @@ pub fn scheduler() -> ! {
 // allocproc sets this as ra for new processes
 pub fn forkret() {
     // TODO: exec first proc (init) here (or not)
-    let proc = unsafe {
-        &mut (*crate::CPU.current)
-    };
+    let proc = unsafe { &mut (*crate::CPU.current) };
 
     prepare_return(proc);
     let satp = proc.pagetable.get_satp().into();

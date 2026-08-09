@@ -1,5 +1,7 @@
 pub mod syscall;
 
+use core::any;
+
 use alloc::{boxed::Box, format, vec::Vec};
 
 use crate::{
@@ -96,5 +98,28 @@ impl Kernel {
         }
 
         None
+    }
+
+    pub fn reparent(&mut self, pid: Option<usize>) {
+        // let pid = pid.expect("reparent: uninitalized process");
+
+        let mut any_child = false;
+        for proc in &mut self.process_table {
+            if proc.parent == pid {
+                proc.parent = Some(1);
+                any_child = true;
+            }
+        }
+        if any_child {
+            self.wakeup(Some(1));
+        }
+    }
+
+    pub fn wakeup(&mut self, channel: Option<usize>) {
+        for proc in &mut self.process_table {
+            if proc.state == ProcState::Sleeping && proc.sleep_channel == channel {
+                proc.state == ProcState::Runnable;
+            }
+        }
     }
 }

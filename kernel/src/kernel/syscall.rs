@@ -47,6 +47,8 @@ pub fn syscall(proc: &mut Process) {
         SYS_WRITE => sys_write(proc),
         SYS_FORK => sys_fork(proc),
         SYS_EXEC => sys_exec(proc),
+        SYS_WAIT => sys_wait(proc),
+        SYS_EXIT => sys_exit(proc),
         _ => {
             panic!("unimplemented syscall {sys_num}")
         }

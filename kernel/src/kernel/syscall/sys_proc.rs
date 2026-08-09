@@ -29,14 +29,24 @@ pub fn sys_exec(proc: &mut Process) {
         argv_addr += size_of::<usize>();
     }
 
-    proc.kexec(img, argv);
+    let argv_str = argv.iter().map(|s| s.as_ref()).collect();
+    proc.kexec(path, argv_str);
 }
 
-pub fn sys_exit() {}
+pub fn sys_wait(proc: &mut Process) {
+    let status_addr = proc.trapframe.a0;
+    let ret = proc.kwait(status_addr);
+    proc.trapframe.a0 = ret as usize;
+}
+
+pub fn sys_exit(proc: &mut Process) {
+    let xstatus_addr = proc.trapframe.a0;
+    let xstatus: u32 = copy_in(&mut proc.pagetable, xstatus_addr).unwrap();
+    
+    proc.kexit(xstatus);
+}
 
 pub fn sys_getpid() {}
-
-pub fn sys_wait() {}
 
 pub fn sys_sbrk() {}
 
