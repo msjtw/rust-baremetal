@@ -34,6 +34,7 @@ int strcmp(const char*, const char*);
 char* gets(char*, int max);
 unsigned int strlen(const char*);
 void* memset(void*, int, unsigned int);
+int itoa(int, char*);
 int atoi(const char*);
 int memcmp(const void *, const void *, unsigned int);
 void *memcpy(void *, const void *, unsigned int);

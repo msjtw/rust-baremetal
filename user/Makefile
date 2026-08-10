@@ -38,7 +38,9 @@ ULIB = ulib.o usys.o printf.o umalloc.o
 
 UPROGS=\
 	_div \
-	_div_nosys
+	_div_nosys \
+	_prime \
+	_init
 
 all: $(UPROGS)
 
