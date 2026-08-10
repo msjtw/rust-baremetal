@@ -1,10 +1,6 @@
 pub mod trapframe;
 
-use alloc::{
-    format,
-    string::String,
-    vec::{self, Vec},
-};
+use alloc::{string::String, vec::Vec};
 use core::{arch::naked_asm, mem::transmute, ptr};
 
 use alloc::boxed::Box;
@@ -123,6 +119,19 @@ impl Process {
             sleep_channel: None,
             trapframe: Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR),
         })
+    }
+
+    pub fn free(&mut self) -> Result<(), ()> {
+        self.pid = None;
+        self.state = ProcState::Unused;
+        self.parent = None;
+        self.pagetable = virtmemory::Uvm::new()?;
+        self.context = Context::default();
+        self.xstatus = 0;
+        self.sleep_channel = None;
+        self.trapframe = Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR);
+
+        Ok(())
     }
 
     // fn free(&mut self) {}

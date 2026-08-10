@@ -2,8 +2,6 @@ pub mod trampoline;
 
 use core::arch::naked_asm;
 
-use alloc::format;
-
 use crate::{
     csr::SSTATUS_SPP, kernel::syscall::syscall, print, process::prepare_return, read_csr,
     write_csr,

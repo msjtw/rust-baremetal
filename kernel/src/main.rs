@@ -13,7 +13,7 @@ pub mod virtmemory;
 
 extern crate alloc;
 use alloc::string::String;
-use alloc::{format, vec};
+use alloc::vec;
 use spin::Once;
 
 use core::arch::global_asm;
@@ -25,8 +25,8 @@ use crate::trap::init_trap;
 use crate::trap::trampoline::{userret, uservec};
 use crate::virtmemory::RAMEND;
 
-const PRIME: &[u8; 3713] = include_bytes!("../../user/_prime.bin");
-const INIT: &[u8; 3573] = include_bytes!("../../user/_init.bin");
+const PRIME: &[u8] = include_bytes!("../../user/_prime.bin");
+const INIT: &[u8] = include_bytes!("../../user/_init.bin");
 
 #[global_allocator]
 static HEAP_ALLOCATOR: allocator::LockedHeap<32> = allocator::LockedHeap::<32>::new();
@@ -59,7 +59,7 @@ macro_rules! print {
         $crate::uart_print("")
     };
     ($($arg:tt)*) => {{
-        $crate::uart_print(&format!($($arg)*));
+        $crate::uart_print(&alloc::format!($($arg)*));
     }};
 }
 
@@ -111,12 +111,8 @@ pub extern "C" fn main() -> ! {
 
         // Start init
         let user_p0 = kernel.allocproc().unwrap();
-        user_p0.kexec(String::from(""), vec!["10"]).unwrap();
+        user_p0.kexec(String::from("init"), vec!["10"]).unwrap();
         user_p0.state = process::ProcState::Runnable;
-
-        let user_p1 = kernel.allocproc().unwrap();
-        user_p1.kexec(String::from(""), vec!["17"]).unwrap();
-        user_p1.state = process::ProcState::Runnable;
     }
 
     process::scheduler();
