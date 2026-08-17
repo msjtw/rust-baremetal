@@ -7,10 +7,7 @@ use core::{
 use alloc::{alloc::Allocator, string::String, vec::Vec};
 
 use crate::{
-    FRAME_ALLOCATOR, HEAP_ALLOCATOR,
-    process::{Process, trapframe::Trapframe},
-    trap::trampoline::_trampoline,
-    write_csr,
+    FRAME_ALLOCATOR, HEAP_ALLOCATOR, print, process::{Process, trapframe::Trapframe}, trap::trampoline::_trampoline, write_csr
 };
 
 unsafe extern "C" {
@@ -283,7 +280,7 @@ impl PageTable {
             pte.v = true;
             let mut pte: usize = pte.into(); // set permissions
             pte |= perm;
-            // print!("-> 0x{:x} 0x{:x}\n", paddr, Pte::from(pte).pa);
+            print!("-> 0x{:x} 0x{:x} perm: 0b{:b}\n", paddr, vaddr, Pte::from(pte).perm);
             unsafe { pte_addr.write(pte) };
 
             vaddr += PAGESIZE;
@@ -412,6 +409,8 @@ impl Clone for Uvm {
             let to = FRAME_ALLOCATOR.allocate(PAGE_LAYOUT).unwrap().as_ptr() as *mut u8;
             unsafe { copy_nonoverlapping(from, to, PAGESIZE) };
 
+            print!("perm: {:?}\n", pte.perm);
+
             vm.pagetable.map(addr, to as usize, PAGESIZE, pte.perm).unwrap();
         }
 
@@ -419,12 +418,13 @@ impl Clone for Uvm {
     }
 }
 
-impl Drop for Uvm {
-    fn drop(&mut self) {
-        self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true);
-        self.pagetable.unmap(TRAPFRAME, PAGESIZE, true);
-    }
-}
+// FIXME: impl drop
+// impl Drop for Uvm {
+//     fn drop(&mut self) {
+//         self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true);
+//         self.pagetable.unmap(TRAPFRAME, PAGESIZE, true);
+//     }
+// }
 
 // The address space is continuous and starts at virt 0x80000000
 impl Uvm {

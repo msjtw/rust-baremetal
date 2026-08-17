@@ -150,14 +150,15 @@ impl Process {
         }
     }
 
-    pub fn kfork(&mut self, kernel: &mut Kernel) -> Result<usize, ()> {
+    pub fn kfork(&mut self) -> Result<usize, ()> {
+        let mut kernel = crate::KERNEL.get().unwrap().lock();
         let child_proc = kernel.allocproc().ok_or(())?;
+        child_proc.trapframe = Box::new_in((*self.trapframe).clone(), &FRAME_ALLOCATOR);
 
         let mut uvm = self.pagetable.clone();
         uvm.init_proc(child_proc)?;
         child_proc.pagetable = uvm;
 
-        child_proc.trapframe = Box::new_in(*self.trapframe.clone(), &FRAME_ALLOCATOR);
 
         // return 0 in child
         child_proc.trapframe.a0 = 0;
@@ -324,8 +325,10 @@ unsafe extern "C" fn switch(c1: &mut Context, c2: &mut Context) {
     );
 }
 
+// FIX: it prefers processes with lower pids and it's possible to starve other
 pub fn scheduler() -> ! {
     loop {
+        let mut found = false;
         print!("scheduler\n");
         unsafe {
             interrupt_on();
@@ -333,19 +336,26 @@ pub fn scheduler() -> ! {
         }
 
         for proc in &mut KERNEL.get().unwrap().lock().process_table {
-            match proc.state {
-                ProcState::Runnable => {
-                    proc.state = ProcState::Running;
-                    print!("Swiching to process {:?}\n", proc.pid);
-                    print!("stack pointer 0x{:x}\n", proc.trapframe.sp);
-                    unsafe {
-                        crate::CPU.current = proc as *mut Process;
-                        switch(&mut crate::CPU.context, &mut proc.context);
-                        crate::CPU.current = ptr::null_mut();
-                    }
+            if proc.state == ProcState::Runnable {
+                found = true;
+                proc.state = ProcState::Running;
+                print!("Swiching to process {:?}\n", proc.pid);
+                print!("stack pointer 0x{:x}\n", proc.trapframe.sp);
+                unsafe {
+                    crate::CPU.current = proc as *mut Process;
                 }
-                _ => {}
+                break;
             }
+        }
+
+        if found {
+            unsafe {
+                switch(&mut crate::CPU.context, &mut (*crate::CPU.current).context);
+                crate::CPU.current = ptr::null_mut();
+            }
+        }
+        else {
+
         }
     }
 }

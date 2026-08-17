@@ -6,8 +6,7 @@ use crate::{
 };
 
 pub fn sys_fork(proc: &mut Process) {
-    let mut kernel = crate::KERNEL.get().unwrap().lock();
-    proc.kfork(&mut kernel).unwrap();
+    proc.kfork().unwrap();
 }
 
 pub fn sys_exec(proc: &mut Process) {

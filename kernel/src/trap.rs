@@ -169,6 +169,7 @@ pub extern "C" fn usertrap() -> usize {
         let sepc = read_csr!(sepc);
         let sstatus = read_csr!(sstatus);
         let scause = read_csr!(scause);
+        let stval = read_csr!(stval);
         proc = &mut (*(crate::CPU).current);
         // kernel = &mut crate::CPU;
 
@@ -212,7 +213,7 @@ pub extern "C" fn usertrap() -> usize {
                     (*(crate::CPU).current).yeld();
                 }
             }
-            _ => panic!(),
+            _ => panic!("user> cause 0x{:x}, val: 0x{:x}", scause, stval),
         }
         prepare_return(proc);
     }
