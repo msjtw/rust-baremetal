@@ -3,7 +3,7 @@ pub mod trampoline;
 use core::arch::naked_asm;
 
 use crate::{
-    csr::SSTATUS_SPP, kernel::syscall::syscall, print, process::prepare_return, read_csr,
+    csr::SSTATUS_SPP, kernel::syscall::syscall, print, println, process::prepare_return, read_csr,
     write_csr,
 };
 
@@ -177,10 +177,10 @@ pub extern "C" fn usertrap() -> usize {
             panic!("kerneltrap: not from user mode");
         }
 
-        // print!(
-        //     "user>TRAP sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x}\n",
-        //     sepc, sstatus, scause
-        // );
+        println!(
+            "user>pid {:?} TRAP sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x}",
+            proc.pid, sepc, sstatus, scause
+        );
 
         // switch to kernel trap
         let kernelvec = kernelvec as *const () as u32;

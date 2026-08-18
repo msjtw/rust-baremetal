@@ -7,7 +7,7 @@ use core::{
 use alloc::{alloc::Allocator, string::String, vec::Vec};
 
 use crate::{
-    FRAME_ALLOCATOR, HEAP_ALLOCATOR, print, process::{Process, trapframe::Trapframe}, trap::trampoline::_trampoline, write_csr
+    FRAME_ALLOCATOR, HEAP_ALLOCATOR, print, println, process::{Process, trapframe::Trapframe}, trap::trampoline::_trampoline, write_csr
 };
 
 unsafe extern "C" {
@@ -75,7 +75,7 @@ impl From<usize> for Pte {
             w: (pte & 0b00000000000000000000000000000100) >= 1,
             r: (pte & 0b00000000000000000000000000000010) >= 1,
             v: (pte & 0b00000000000000000000000000000001) >= 1,
-            perm: (pte & 0b1110),
+            perm: (pte & 0b11110),
         }
     }
 }
@@ -280,7 +280,6 @@ impl PageTable {
             pte.v = true;
             let mut pte: usize = pte.into(); // set permissions
             pte |= perm;
-            print!("-> 0x{:x} 0x{:x} perm: 0b{:b}\n", paddr, vaddr, Pte::from(pte).perm);
             unsafe { pte_addr.write(pte) };
 
             vaddr += PAGESIZE;
@@ -408,8 +407,6 @@ impl Clone for Uvm {
             let from = pte.pa as *const u8;
             let to = FRAME_ALLOCATOR.allocate(PAGE_LAYOUT).unwrap().as_ptr() as *mut u8;
             unsafe { copy_nonoverlapping(from, to, PAGESIZE) };
-
-            print!("perm: {:?}\n", pte.perm);
 
             vm.pagetable.map(addr, to as usize, PAGESIZE, pte.perm).unwrap();
         }
@@ -575,10 +572,10 @@ pub fn copy_in_str(uv: &mut Uvm, addr: usize) -> Result<String, ()> {
     let mut i = 0;
     loop {
         let byte = unsafe { (user_addr as *const u8).add(i).read() };
-        bytes.push(byte);
         if byte == 0 {
             break;
         }
+        bytes.push(byte);
         i += 1;
     }
 

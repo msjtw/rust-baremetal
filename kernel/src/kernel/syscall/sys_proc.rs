@@ -1,8 +1,7 @@
 use alloc::{string::String, vec::Vec};
 
 use crate::{
-    process::Process,
-    virtmemory::{copy_in, copy_in_str},
+    println, process::Process, virtmemory::{copy_in, copy_in_str}
 };
 
 pub fn sys_fork(proc: &mut Process) {
@@ -18,11 +17,12 @@ pub fn sys_exec(proc: &mut Process) {
     let mut argv = Vec::<String>::new();
     loop {
         let arg_addr = copy_in::<usize>(&mut proc.pagetable, argv_addr).unwrap();
+        println!("arg: {} addr: 0x{:x}", argv.len(), arg_addr);
         if arg_addr == 0 {
             break;
         }
 
-        let arg_str = copy_in_str(&mut proc.pagetable, argv_addr).unwrap();
+        let arg_str = copy_in_str(&mut proc.pagetable, arg_addr).unwrap();
         argv.push(arg_str);
 
         argv_addr += size_of::<usize>();
@@ -39,10 +39,8 @@ pub fn sys_wait(proc: &mut Process) {
 }
 
 pub fn sys_exit(proc: &mut Process) {
-    let xstatus_addr = proc.trapframe.a0;
-    let xstatus: u32 = copy_in(&mut proc.pagetable, xstatus_addr).unwrap();
-    
-    proc.kexit(xstatus);
+    let xstatus = proc.trapframe.a0;
+    proc.kexit(xstatus as u32);
 }
 
 pub fn sys_getpid() {}

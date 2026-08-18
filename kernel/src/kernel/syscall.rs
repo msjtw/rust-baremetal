@@ -4,7 +4,9 @@ mod sys_file;
 mod sys_proc;
 
 use crate::{
-    kernel::syscall::{sys_file::sys_write, sys_proc::*}, print, process::Process
+    kernel::syscall::{sys_file::sys_write, sys_proc::*},
+    print,
+    process::Process,
 };
 
 // System call numbers
@@ -39,6 +41,8 @@ pub const SYS_CLOSE: usize = 21;
 pub fn syscall(proc: &mut Process) {
     let sys_num = proc.trapframe.a7;
     // let args: [u32; 6];
+
+    print!("syscall: {}\n", sys_num);
 
     match sys_num {
         SYS_WRITE => sys_write(proc),

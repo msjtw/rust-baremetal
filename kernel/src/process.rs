@@ -1,7 +1,11 @@
 pub mod trapframe;
 
 use alloc::{string::String, vec::Vec};
-use core::{arch::naked_asm, mem::transmute, ptr};
+use core::{
+    arch::{asm, naked_asm},
+    mem::transmute,
+    ptr,
+};
 
 use alloc::boxed::Box;
 
@@ -10,7 +14,7 @@ use crate::{
     allocator::FrameAllocator,
     csr::{SSTATUS_SPIE, SSTATUS_SPP},
     kernel::Kernel,
-    print,
+    print, println,
     process::trapframe::Trapframe,
     read_csr,
     trap::{
@@ -104,6 +108,8 @@ pub struct Process {
     pub xstatus: u32,
     pub sleep_channel: Option<usize>,
     pub trapframe: Box<Trapframe, &'static FrameAllocator>,
+
+    pub quants: usize,
 }
 
 impl Process {
@@ -118,6 +124,7 @@ impl Process {
             xstatus: 0,
             sleep_channel: None,
             trapframe: Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR),
+            quants: 0,
         })
     }
 
@@ -159,7 +166,6 @@ impl Process {
         uvm.init_proc(child_proc)?;
         child_proc.pagetable = uvm;
 
-
         // return 0 in child
         child_proc.trapframe.a0 = 0;
         // and cpid in parent
@@ -176,7 +182,8 @@ impl Process {
     pub fn kexec(&mut self, path: String, argv: Vec<&str>) -> Result<(), ()> {
         // TODO: when file sytem is implemented load from filr
 
-        let img: &[u8] = match path.as_str() {
+        println!("={:?}=", path.trim_end());
+        let img: &[u8] = match path.trim_end() {
             "init" => crate::INIT,
             "prime" => crate::PRIME,
             _ => panic!("kexec: unknown program"),
@@ -232,7 +239,7 @@ impl Process {
     }
 
     pub fn kexit(&mut self, xstatus: u32) -> ! {
-        if self.pid == Some(1) {
+        if self.pid == Some(0) {
             panic!("init exit");
         }
 
@@ -256,13 +263,16 @@ impl Process {
             let mut has_kids = false;
 
             for proc in &mut KERNEL.get().unwrap().lock().process_table {
+                println!(
+                    "self: {:?} proc: {:?} -> {:?} state: {:?}",
+                    self.pid, proc.pid, proc.parent, proc.state
+                );
                 if proc.parent == self.pid {
                     has_kids = true;
                     if proc.state == ProcState::Zombie {
                         if status_addr != 0 {
                             copy_out(&mut self.pagetable, status_addr, proc.xstatus).unwrap();
                         }
-                        proc.state = ProcState::Delete;
                         return proc.pid.unwrap() as i32;
                     }
                 }
@@ -271,6 +281,8 @@ impl Process {
             if !has_kids {
                 return -1;
             }
+
+            println!("has kids: {}", has_kids);
 
             self.sleep(self.pid);
         }
@@ -325,7 +337,6 @@ unsafe extern "C" fn switch(c1: &mut Context, c2: &mut Context) {
     );
 }
 
-// FIX: it prefers processes with lower pids and it's possible to starve other
 pub fn scheduler() -> ! {
     loop {
         let mut found = false;
@@ -334,28 +345,36 @@ pub fn scheduler() -> ! {
             interrupt_on();
             interrupt_off();
         }
+        {
+            let mut kernel = KERNEL.get().unwrap().lock();
+            let table = &mut kernel.process_table;
 
-        for proc in &mut KERNEL.get().unwrap().lock().process_table {
-            if proc.state == ProcState::Runnable {
-                found = true;
-                proc.state = ProcState::Running;
-                print!("Swiching to process {:?}\n", proc.pid);
-                print!("stack pointer 0x{:x}\n", proc.trapframe.sp);
-                unsafe {
-                    crate::CPU.current = proc as *mut Process;
+            table.sort_by_key(|proc| proc.quants);
+
+            for proc in table {
+                if proc.state == ProcState::Runnable {
+                    found = true;
+                    proc.state = ProcState::Running;
+                    unsafe {
+                        crate::CPU.current = proc as *mut Process;
+                    }
+                    break;
                 }
-                break;
             }
         }
 
         if found {
             unsafe {
+                print!("Swiching to process {:?}\n", (*crate::CPU.current).pid);
+                (*crate::CPU.current).quants += 1;
                 switch(&mut crate::CPU.context, &mut (*crate::CPU.current).context);
                 crate::CPU.current = ptr::null_mut();
             }
-        }
-        else {
-
+        } else {
+            println!("no processes found");
+            unsafe {
+                asm!("wfi");
+            }
         }
     }
 }

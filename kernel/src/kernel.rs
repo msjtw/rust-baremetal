@@ -104,19 +104,19 @@ impl Kernel {
         let mut any_child = false;
         for proc in &mut self.process_table {
             if proc.parent == pid {
-                proc.parent = Some(1);
+                proc.parent = Some(0);
                 any_child = true;
             }
         }
         if any_child {
-            self.wakeup(Some(1));
+            self.wakeup(Some(0));
         }
     }
 
     pub fn wakeup(&mut self, channel: Option<usize>) {
         for proc in &mut self.process_table {
             if proc.state == ProcState::Sleeping && proc.sleep_channel == channel {
-                proc.state == ProcState::Runnable;
+                proc.state = ProcState::Runnable;
             }
         }
     }

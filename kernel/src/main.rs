@@ -55,11 +55,18 @@ global_asm!(
 
 #[macro_export]
 macro_rules! print {
-    () => {
-        $crate::uart_print("")
-    };
     ($($arg:tt)*) => {{
         $crate::uart_print(&alloc::format!($($arg)*));
+    }};
+}
+
+#[macro_export]
+macro_rules! println {
+    () => {{
+        $crate::uart_print("\n");
+    }};
+    ($($arg:tt)*) => {{
+        $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
     }};
 }
 
