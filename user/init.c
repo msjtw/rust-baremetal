@@ -7,7 +7,7 @@ int main() {
             // child
             char buff[20];
             itoa(i, buff);
-            char* args[] = {buff};
+            char* args[] = {buff, 0};
             exec("prime", args);
         } else{
             //parent
