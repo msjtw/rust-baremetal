@@ -1,5 +1,5 @@
 #[repr(C)]
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct Trapframe {
     pub kernel_satp: usize,
     pub kernel_sp: usize,

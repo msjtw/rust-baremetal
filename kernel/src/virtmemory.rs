@@ -1,13 +1,16 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
     arch::asm,
-    ptr::{NonNull, copy_nonoverlapping},
+    ptr::{NonNull, copy_nonoverlapping, write_bytes},
 };
 
 use alloc::{alloc::Allocator, string::String, vec::Vec};
 
 use crate::{
-    FRAME_ALLOCATOR, HEAP_ALLOCATOR, print, println, process::{Process, trapframe::Trapframe}, trap::trampoline::_trampoline, write_csr
+    FRAME_ALLOCATOR, HEAP_ALLOCATOR, debug, println,
+    process::{Process, trapframe::Trapframe},
+    trap::trampoline::_trampoline,
+    write_csr,
 };
 
 unsafe extern "C" {
@@ -192,6 +195,7 @@ impl From<PA> for usize {
     }
 }
 
+#[derive(Debug)]
 pub struct PageTable {
     root: NonNull<usize>,
 }
@@ -200,26 +204,58 @@ unsafe impl Send for PageTable {}
 
 impl Default for PageTable {
     fn default() -> PageTable {
-        let ptr = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as *mut usize };
-
-        let pagetable = NonNull::new(ptr).expect("failed to allocate root page table");
-
-        Self { root: pagetable }
+        PageTable::new()
     }
 }
 
 impl Drop for PageTable {
     fn drop(&mut self) {
-        // // trampoline
-        // self.unmap(virt, size, free);
-        // // trapframe
-        // self.unmap(virt, size, free);
-        //
-        // self.free();
+        debug!("dropping pagetable");
+        self.free();
     }
 }
 
 impl PageTable {
+    fn new() -> PageTable {
+        debug!("new pagetable :)");
+        let ptr = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as *mut usize };
+        unsafe { write_bytes(ptr, 0, 1024) };
+
+        let pagetable = NonNull::new(ptr).expect("failed to allocate root page table");
+
+        Self { root: pagetable }
+    }
+
+    fn free(&mut self) {
+        // free all 2nd level page tables
+        // there are 1024 PTES in pagetable
+        PageTable::free_req(self.root);
+
+        // free root
+        unsafe { HEAP_ALLOCATOR.dealloc(self.root.as_ptr() as *mut u8, PAGE_LAYOUT) };
+    }
+    fn free_req(root: NonNull<usize>) {
+        debug!("removing pt node");
+        for i in 0..1024 {
+            let pte = unsafe { root.add(i).read() };
+            let pte = Pte::from(pte);
+            if pte.v {
+                if !pte.r && !pte.w && !pte.x {
+                    // lower level page table
+                    let root = NonNull::new((pte.ppn << 12) as *mut usize).unwrap();
+                    PageTable::free_req(root);
+                    unsafe { root.write(0) };
+                } else {
+                    // there is some unmapped allocaed page
+                    panic!(
+                        "unmapping allocated page 0x{:x} perm: 0b{:b}",
+                        pte.pa, pte.perm
+                    );
+                }
+            }
+        }
+    }
+
     // returns leaf pte addr for given virtual address
     // with support for megapages
     fn walk(&self, virt_a: usize, walk_type: WalkType) -> Option<NonNull<usize>> {
@@ -231,24 +267,23 @@ impl PageTable {
 
         let pte = Pte::from(pte_u32);
 
-        let a: PageTable;
+        let a: NonNull<usize>;
         if pte.v {
-            let root = NonNull::new((pte.ppn << 12) as *mut usize)?;
-            a = PageTable { root };
+            a = NonNull::new((pte.ppn << 12) as *mut usize)?;
         } else {
             if walk_type == WalkType::Walk {
                 return None;
             }
             let new_page = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as *mut usize };
+            unsafe { write_bytes(new_page, 0, 1024) };
             let mut new_pte = Pte::from_addr(new_page as usize);
             new_pte.v = true;
             unsafe { pte_addr.write(new_pte.into()) };
-            let root = NonNull::new(new_page)?;
-            a = PageTable { root };
+            a = NonNull::new(new_page)?;
         }
 
         let index = va.vpn(0)?;
-        let pte_addr = unsafe { a.root.add(index) };
+        let pte_addr = unsafe { a.add(index) };
 
         Some(pte_addr)
     }
@@ -282,6 +317,9 @@ impl PageTable {
             pte |= perm;
             unsafe { pte_addr.write(pte) };
 
+            if vaddr != paddr {
+                debug!("mapping 0x{:x} -> 0x{:x}", vaddr, paddr);
+            }
             vaddr += PAGESIZE;
             paddr += PAGESIZE;
         }
@@ -291,13 +329,15 @@ impl PageTable {
     // remove mappings from virt to virt+size
     // if free it will also free the mapped pages but not the internal tree pages
     fn unmap(&mut self, virt: usize, size: usize, free: bool) -> Result<(), ()> {
+        debug!("freeing virt: 0x{:x} size 0x{:x}", virt, size);
         if !size.is_multiple_of(PAGESIZE) {
             return Err(());
         }
 
         let mut va = virt;
-        while va < virt + size {
-            let pte_addr = match self.walk(va as usize, WalkType::Alloc) {
+        for _ in 0..(size / PAGESIZE) {
+            debug!("unmapping addr: 0x{:x}, size: 0x{:x}", va, size);
+            let pte_addr = match self.walk(va as usize, WalkType::Walk) {
                 Some(x) => x,
                 None => continue,
             };
@@ -316,6 +356,7 @@ impl PageTable {
     }
 }
 
+#[derive(Debug)]
 pub struct Kvm {
     pagetable: PageTable,
 }
@@ -388,6 +429,7 @@ impl Kvm {
     // continous virt to virt + size to continous phys to phys + size
 }
 
+#[derive(Debug)]
 pub struct Uvm {
     begin: usize,
     size: usize,
@@ -408,20 +450,20 @@ impl Clone for Uvm {
             let to = FRAME_ALLOCATOR.allocate(PAGE_LAYOUT).unwrap().as_ptr() as *mut u8;
             unsafe { copy_nonoverlapping(from, to, PAGESIZE) };
 
-            vm.pagetable.map(addr, to as usize, PAGESIZE, pte.perm).unwrap();
+            vm.pagetable
+                .map(addr, to as usize, PAGESIZE, pte.perm)
+                .unwrap();
         }
 
         vm
     }
 }
 
-// FIXME: impl drop
-// impl Drop for Uvm {
-//     fn drop(&mut self) {
-//         self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true);
-//         self.pagetable.unmap(TRAPFRAME, PAGESIZE, true);
-//     }
-// }
+impl Drop for Uvm {
+    fn drop(&mut self) {
+        self.free();
+    }
+}
 
 // The address space is continuous and starts at virt 0x80000000
 impl Uvm {
@@ -434,6 +476,15 @@ impl Uvm {
         Ok(uvm)
     }
 
+    pub fn free(&mut self) {
+        debug!("uvm free");
+        self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true).unwrap();
+        self.pagetable.unmap(TRAPFRAME, PAGESIZE, true).unwrap();
+
+        // this frees all pages in this vm but leaves page tree structure
+        self.pagetable.unmap(self.begin, self.size, true).unwrap();
+    }
+
     pub fn get_satp(&self) -> SATP {
         let ppn = (self.pagetable.root.as_ptr() as usize) >> 12;
         SATP {
@@ -441,10 +492,6 @@ impl Uvm {
             asid: 0,
             ppn,
         }
-    }
-
-    pub fn free() {
-        // FIXME: implement free
     }
 
     pub fn end(&self) -> usize {
@@ -481,12 +528,8 @@ impl Uvm {
 
     pub fn init_proc(&mut self, proc: &Process) -> Result<(), ()> {
         let trampoline = unsafe { &_trampoline as *const usize as usize };
-        self.pagetable.map(
-            TRAMPOLINE,
-            trampoline,
-            PAGESIZE,
-            PTE_R | PTE_X,
-        )?;
+        self.pagetable
+            .map(TRAMPOLINE, trampoline, PAGESIZE, PTE_R | PTE_X)?;
 
         self.pagetable.map(
             TRAPFRAME,

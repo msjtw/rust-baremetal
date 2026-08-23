@@ -16,7 +16,7 @@ use alloc::string::String;
 use alloc::vec;
 use spin::Once;
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
 
@@ -48,8 +48,8 @@ global_asm!(
         la sp, _STACK_PTR
         call main
 
-    spin:
-        j spin
+    park:
+        j park
     "
 );
 
@@ -67,6 +67,22 @@ macro_rules! println {
     }};
     ($($arg:tt)*) => {{
         $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
+    }};
+}
+
+pub const DEBUG: bool = false;
+
+#[macro_export]
+macro_rules! debug {
+    () => {{
+        if $crate::DEBUG {
+            $crate::uart_print("\n");
+        }
+    }};
+    ($($arg:tt)*) => {{
+        if $crate::DEBUG {
+            $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
+        }
     }};
 }
 
@@ -99,12 +115,13 @@ pub extern "C" fn main() -> ! {
             .init(ekernel, RAMEND as usize - ekernel);
     }
 
+
     init_trap();
     KERNEL.call_once(|| lock::IntMutex::new(Kernel::default()));
     {
         let mut kernel = KERNEL.get().unwrap().lock();
 
-        print!("Hello world\n");
+        debug!("Hello world\n");
 
         kernel.init().expect("Kernel init fail");
 
@@ -114,7 +131,7 @@ pub extern "C" fn main() -> ! {
             .as_mut()
             .expect("KVM not initialized")
             .start_kvm();
-        print!("Virt started\n");
+        debug!("Virt started\n");
 
         // Start init
         let user_p0 = kernel.allocproc().unwrap();

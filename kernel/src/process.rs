@@ -13,7 +13,6 @@ use crate::{
     FRAME_ALLOCATOR, KERNEL,
     allocator::FrameAllocator,
     csr::{SSTATUS_SPIE, SSTATUS_SPP},
-    kernel::Kernel,
     print, println,
     process::trapframe::Trapframe,
     read_csr,
@@ -55,7 +54,7 @@ pub enum ProcState {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Context {
     pub ra: usize,
     pub sp: usize,
@@ -98,7 +97,9 @@ impl Context {
 // processes are initialized on boot (state: Unused and kstack)
 // When new process is created pid, state and pagetable are assigned.
 //
+#[derive(Debug)]
 pub struct Process {
+    pub id: usize,
     pub pid: Option<usize>,
     pub state: ProcState,
     pub kstack: usize, // virt addr of kernel stack page
@@ -115,6 +116,7 @@ pub struct Process {
 impl Process {
     pub fn new(n: usize) -> Result<Process, ()> {
         Ok(Process {
+            id: n,
             pid: None,
             state: ProcState::default(),
             kstack: KSTACK!(n),
@@ -182,7 +184,6 @@ impl Process {
     pub fn kexec(&mut self, path: String, argv: Vec<&str>) -> Result<(), ()> {
         // TODO: when file sytem is implemented load from filr
 
-        println!("={:?}=", path.trim_end());
         let img: &[u8] = match path.trim_end() {
             "init" => crate::INIT,
             "prime" => crate::PRIME,
@@ -263,27 +264,23 @@ impl Process {
             let mut has_kids = false;
 
             for proc in &mut KERNEL.get().unwrap().lock().process_table {
-                println!(
-                    "self: {:?} proc: {:?} -> {:?} state: {:?}",
-                    self.pid, proc.pid, proc.parent, proc.state
-                );
                 if proc.parent == self.pid {
                     has_kids = true;
                     if proc.state == ProcState::Zombie {
                         if status_addr != 0 {
                             copy_out(&mut self.pagetable, status_addr, proc.xstatus).unwrap();
                         }
-                        return proc.pid.unwrap() as i32;
+                        let pid = proc.pid.expect("pid-less child (what?)") as i32;
+                        proc.free().unwrap();
+                        return pid;
                     }
                 }
             }
 
             if !has_kids {
+                println!("no kids");
                 return -1;
             }
-
-            println!("has kids: {}", has_kids);
-
             self.sleep(self.pid);
         }
     }
@@ -299,7 +296,7 @@ impl Process {
 }
 
 #[unsafe(naked)]
-unsafe extern "C" fn switch(c1: &mut Context, c2: &mut Context) {
+unsafe extern "C" fn switch(from: &mut Context, to: &mut Context) {
     naked_asm!(
         "
         sw ra, 0(a0)
@@ -340,7 +337,7 @@ unsafe extern "C" fn switch(c1: &mut Context, c2: &mut Context) {
 pub fn scheduler() -> ! {
     loop {
         let mut found = false;
-        print!("scheduler\n");
+        print!("scheduler: ");
         unsafe {
             interrupt_on();
             interrupt_off();
@@ -348,16 +345,21 @@ pub fn scheduler() -> ! {
         {
             let mut kernel = KERNEL.get().unwrap().lock();
             let table = &mut kernel.process_table;
+            let mut order: Vec<usize> = (0..table.len()).collect();
 
-            table.sort_by_key(|proc| proc.quants);
+            order.sort_by_key(|&i| table[i].quants);
 
-            for proc in table {
+            for i in order {
+                let proc = &mut table[i];
+
                 if proc.state == ProcState::Runnable {
-                    found = true;
                     proc.state = ProcState::Running;
+                    found = true;
+
                     unsafe {
                         crate::CPU.current = proc as *mut Process;
                     }
+
                     break;
                 }
             }
@@ -365,8 +367,8 @@ pub fn scheduler() -> ! {
 
         if found {
             unsafe {
-                print!("Swiching to process {:?}\n", (*crate::CPU.current).pid);
                 (*crate::CPU.current).quants += 1;
+                println!("switching to process {:?}", (*crate::CPU.current).pid);
                 switch(&mut crate::CPU.context, &mut (*crate::CPU.current).context);
                 crate::CPU.current = ptr::null_mut();
             }

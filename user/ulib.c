@@ -110,7 +110,7 @@ int itoa(int a, char *s) {
     }
 
     for (int i = 0; i < len; i++) {
-        s[i] = buff[len - i];
+        s[i] = buff[len - i -1];
     }
     s[len] = '\0';
     return len;

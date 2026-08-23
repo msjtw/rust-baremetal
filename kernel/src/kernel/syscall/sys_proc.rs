@@ -1,14 +1,16 @@
 use alloc::{string::String, vec::Vec};
 
 use crate::{
-    println, process::Process, virtmemory::{copy_in, copy_in_str}
+    debug, println, process::Process, virtmemory::{copy_in, copy_in_str}
 };
 
 pub fn sys_fork(proc: &mut Process) {
+    debug!("fork");
     proc.kfork().unwrap();
 }
 
 pub fn sys_exec(proc: &mut Process) {
+    debug!("exec");
     let path_addr = proc.trapframe.a0;
     let mut argv_addr = proc.trapframe.a1;
 
@@ -17,7 +19,6 @@ pub fn sys_exec(proc: &mut Process) {
     let mut argv = Vec::<String>::new();
     loop {
         let arg_addr = copy_in::<usize>(&mut proc.pagetable, argv_addr).unwrap();
-        println!("arg: {} addr: 0x{:x}", argv.len(), arg_addr);
         if arg_addr == 0 {
             break;
         }
@@ -29,16 +30,19 @@ pub fn sys_exec(proc: &mut Process) {
     }
 
     let argv_str = argv.iter().map(|s| s.as_ref()).collect();
-    proc.kexec(path, argv_str);
+    proc.kexec(path, argv_str).unwrap();
 }
 
 pub fn sys_wait(proc: &mut Process) {
+    debug!("wait");
     let status_addr = proc.trapframe.a0;
     let ret = proc.kwait(status_addr);
     proc.trapframe.a0 = ret as usize;
 }
 
 pub fn sys_exit(proc: &mut Process) {
+    debug!("exit");
+    let status_addr = proc.trapframe.a0;
     let xstatus = proc.trapframe.a0;
     proc.kexit(xstatus as u32);
 }

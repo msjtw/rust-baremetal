@@ -42,7 +42,7 @@ pub fn syscall(proc: &mut Process) {
     let sys_num = proc.trapframe.a7;
     // let args: [u32; 6];
 
-    print!("syscall: {}\n", sys_num);
+    // print!("syscall: {}\n", sys_num);
 
     match sys_num {
         SYS_WRITE => sys_write(proc),

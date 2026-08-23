@@ -164,23 +164,22 @@ extern "C" fn kerneltrap() {
 }
 
 pub extern "C" fn usertrap() -> usize {
-    let proc;
     unsafe {
         let sepc = read_csr!(sepc);
         let sstatus = read_csr!(sstatus);
         let scause = read_csr!(scause);
         let stval = read_csr!(stval);
-        proc = &mut (*(crate::CPU).current);
+        let proc = &mut (*(crate::CPU).current);
         // kernel = &mut crate::CPU;
 
         if (sstatus & SSTATUS_SPP as usize) != 0 {
             panic!("kerneltrap: not from user mode");
         }
 
-        println!(
-            "user>pid {:?} TRAP sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x}",
-            proc.pid, sepc, sstatus, scause
-        );
+        // println!(
+        //     "user>pid {:?} TRAP sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x}",
+        //     proc.pid, sepc, sstatus, scause
+        // );
 
         // switch to kernel trap
         let kernelvec = kernelvec as *const () as u32;
@@ -216,7 +215,7 @@ pub extern "C" fn usertrap() -> usize {
             _ => panic!("user> cause 0x{:x}, val: 0x{:x}", scause, stval),
         }
         prepare_return(proc);
+        let satp = proc.pagetable.get_satp();
+        satp.into()
     }
-    let satp = proc.pagetable.get_satp();
-    satp.into()
 }
