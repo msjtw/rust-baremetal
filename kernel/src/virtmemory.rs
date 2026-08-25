@@ -7,10 +7,7 @@ use core::{
 use alloc::{alloc::Allocator, string::String, vec::Vec};
 
 use crate::{
-    FRAME_ALLOCATOR, HEAP_ALLOCATOR, debug, println,
-    process::{Process, trapframe::Trapframe},
-    trap::trampoline::_trampoline,
-    write_csr,
+    FRAME_ALLOCATOR, HEAP_ALLOCATOR, debug, println, process::{Process, trapframe::Trapframe}, trap::trampoline::_trampoline, uart_print, write_csr
 };
 
 unsafe extern "C" {
@@ -263,9 +260,13 @@ impl PageTable {
 
         let index = va.vpn(1)?;
         let pte_addr = unsafe { self.root.as_ptr().add(index) };
-        let pte_u32 = unsafe { pte_addr.read() };
+        let pte = unsafe { pte_addr.read() };
+        if virt_a == 0xffffe000 {
+            debug!("{:?}", pte_addr);
+            debug!("{:x}", pte);
+        }
 
-        let pte = Pte::from(pte_u32);
+        let pte = Pte::from(pte);
 
         let a: NonNull<usize>;
         if pte.v {
@@ -278,13 +279,18 @@ impl PageTable {
             unsafe { write_bytes(new_page, 0, 1024) };
             let mut new_pte = Pte::from_addr(new_page as usize);
             new_pte.v = true;
-            unsafe { pte_addr.write(new_pte.into()) };
+            let tmp: usize = new_pte.into();
+            debug!("new pte: {:?}", tmp);
+            unsafe { pte_addr.write(tmp) };
             a = NonNull::new(new_page)?;
         }
 
         let index = va.vpn(0)?;
         let pte_addr = unsafe { a.add(index) };
 
+        if virt_a == 0xffffe000 {
+            debug!("pte_addr: {:x?}", pte_addr);
+        }
         Some(pte_addr)
     }
 
@@ -339,19 +345,28 @@ impl PageTable {
             debug!("unmapping addr: 0x{:x}, size: 0x{:x}", va, size);
             let pte_addr = match self.walk(va as usize, WalkType::Walk) {
                 Some(x) => x,
-                None => continue,
+                None => {
+                    debug!("no elo");
+                    continue;
+                }
             };
+            debug!("got pte_addr :)");
             let pte = Pte::from(unsafe { pte_addr.read() });
             if !pte.v {
+                debug!("not vaild");
                 continue;
             }
             if free {
-                let page = (pte.ppn << 12) as *mut u8;
+                debug!("freeing time");
+                let page = (pte.pa) as *mut u8;
+                debug!("freeing page 0x{:x}", pte.pa);
                 unsafe { HEAP_ALLOCATOR.dealloc(page, PAGE_LAYOUT) };
+                debug! ("im free");
             }
             unsafe { pte_addr.write(0) };
             va += PAGESIZE;
         }
+        debug!("unmapped");
         Ok(())
     }
 }
@@ -478,11 +493,16 @@ impl Uvm {
 
     pub fn free(&mut self) {
         debug!("uvm free");
+        debug!("trampoline");
         self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true).unwrap();
+        debug!("trapframe");
         self.pagetable.unmap(TRAPFRAME, PAGESIZE, true).unwrap();
 
+        debug!("text");
         // this frees all pages in this vm but leaves page tree structure
-        self.pagetable.unmap(self.begin, self.size, true).unwrap();
+        if self.size > 0 {
+            self.pagetable.unmap(self.begin, self.size, true).unwrap();
+        }
     }
 
     pub fn get_satp(&self) -> SATP {

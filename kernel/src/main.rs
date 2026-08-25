@@ -16,6 +16,7 @@ use alloc::string::String;
 use alloc::vec;
 use spin::Once;
 
+use core::alloc::GlobalAlloc;
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
@@ -23,7 +24,7 @@ use core::ptr::write_volatile;
 use crate::kernel::{Cpu, Kernel};
 use crate::trap::init_trap;
 use crate::trap::trampoline::{userret, uservec};
-use crate::virtmemory::RAMEND;
+use crate::virtmemory::{PAGE_LAYOUT, RAMEND};
 
 const PRIME: &[u8] = include_bytes!("../../user/_prime.bin");
 const INIT: &[u8] = include_bytes!("../../user/_init.bin");
@@ -70,7 +71,7 @@ macro_rules! println {
     }};
 }
 
-pub const DEBUG: bool = false;
+pub const DEBUG: bool = true;
 
 #[macro_export]
 macro_rules! debug {

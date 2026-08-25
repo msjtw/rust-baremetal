@@ -7,8 +7,9 @@ use core::alloc::Layout;
 use core::ops::Deref;
 use core::ptr::NonNull;
 
-use alloc::alloc::{AllocError, Allocator};
+use crate::debug;
 use crate::lock::IntMutex;
+use alloc::alloc::{AllocError, Allocator};
 
 use crate::{
     HEAP_ALLOCATOR,
@@ -38,18 +39,20 @@ impl<const ORDER: usize> Deref for LockedHeap<ORDER> {
 
 unsafe impl<const ORDER: usize> GlobalAlloc for LockedHeap<ORDER> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            let res = self
-                .0
-                .lock()
-                .alloc(layout)
-                .ok()
-                .map_or(core::ptr::null_mut(), |allocation| allocation.as_ptr());
-            res
+        self.0
+            .lock()
+            .alloc(layout)
+            .ok()
+            .map_or(core::ptr::null_mut(), |allocation| allocation.as_ptr())
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         unsafe {
-            self.0.lock().dealloc(NonNull::new_unchecked(ptr), layout);
+            let ptr_non = NonNull::new(ptr).unwrap();
+            if ptr == 0x80235000 as *mut u8 {
+                debug!("im in");
+            }
+            self.0.lock().dealloc(ptr_non, layout);
         }
     }
 }

@@ -339,8 +339,8 @@ pub fn scheduler() -> ! {
         let mut found = false;
         print!("scheduler: ");
         unsafe {
-            interrupt_on();
-            interrupt_off();
+            // interrupt_on();
+            // interrupt_off();
         }
         {
             let mut kernel = KERNEL.get().unwrap().lock();
