@@ -152,10 +152,18 @@ impl Process {
     }
 
     unsafe fn sched(&mut self) {
-        unsafe {
-            let interrupt_prev_state = (crate::CPU).interrupt_prev_state;
-            switch(&mut self.context, &mut (crate::CPU).context);
-            (crate::CPU).interrupt_prev_state = interrupt_prev_state;
+        // FIX: sched must only run under interrupt-off critical section.
+        // This catches trap/scheduler handoff bugs that used to depend on timing.
+        if unsafe { crate::CPU.interrupt_off_stack } == 0 {
+            panic!("sched with interrupts enabled");
+        }
+        let off_depth = unsafe { crate::CPU.interrupt_off_stack };
+
+        // FIX: Do not save/restore global interrupt_prev_state across switch.
+        // The scheduler owns interrupt state; we only verify nesting remains stable.
+        unsafe { switch(&mut self.context, &mut crate::CPU.context) };
+        if unsafe { crate::CPU.interrupt_off_stack } != off_depth {
+            panic!("sched changed interrupt nesting");
         }
     }
 
@@ -261,27 +269,54 @@ impl Process {
 
     pub fn kwait(&mut self, status_addr: usize) -> i32 {
         loop {
+            let parent_pid = self.pid;
             let mut has_kids = false;
+            let mut zombie_pid = None;
+            let mut zombie_xstatus = 0;
 
-            for proc in &mut KERNEL.get().unwrap().lock().process_table {
-                if proc.parent == self.pid {
-                    has_kids = true;
-                    if proc.state == ProcState::Zombie {
-                        if status_addr != 0 {
-                            copy_out(&mut self.pagetable, status_addr, proc.xstatus).unwrap();
+            {
+                // FIX: Hold one kernel lock across child scan and sleep-state publication
+                // so wakeup cannot race between "no zombie found" and "go to sleep".
+                let mut kernel = KERNEL.get().unwrap().lock();
+                let table = &mut kernel.process_table;
+
+                for proc in table.iter_mut() {
+                    if proc.parent == parent_pid {
+                        has_kids = true;
+                        if proc.state == ProcState::Zombie {
+                            zombie_xstatus = proc.xstatus;
+                            zombie_pid = proc.pid;
+                            proc.free().unwrap();
+                            break;
                         }
-                        let pid = proc.pid.expect("pid-less child (what?)") as i32;
-                        proc.free().unwrap();
-                        return pid;
                     }
                 }
+
+                if zombie_pid.is_none() && has_kids {
+                    // FIX: Publish sleep fields while lock is held to prevent lost wakeups.
+                    let parent = table
+                        .iter_mut()
+                        .find(|proc| proc.pid == parent_pid)
+                        .expect("waiting process missing from process table");
+                    parent.sleep_channel = parent_pid;
+                    parent.state = ProcState::Sleeping;
+                }
+            }
+
+            if let Some(pid) = zombie_pid {
+                if status_addr != 0 {
+                    copy_out(&mut self.pagetable, status_addr, zombie_xstatus).unwrap();
+                }
+                return pid as i32;
             }
 
             if !has_kids {
                 println!("no kids");
                 return -1;
             }
-            self.sleep(self.pid);
+
+            unsafe { self.sched() };
+            self.sleep_channel = None;
         }
     }
 
@@ -338,9 +373,9 @@ pub fn scheduler() -> ! {
     loop {
         let mut found = false;
         print!("scheduler: ");
-        unsafe {
-            interrupt_on();
-            interrupt_off();
+        // FIX: Scheduler invariant is now explicit: run this loop with interrupts off.
+        if interrupt_read() {
+            panic!("scheduler entered with interrupts enabled");
         }
         {
             let mut kernel = KERNEL.get().unwrap().lock();
@@ -375,7 +410,11 @@ pub fn scheduler() -> ! {
         } else {
             println!("no processes found");
             unsafe {
+                // FIX: Enable interrupts around WFI so timer/external IRQ can wake the CPU,
+                // then return to scheduler invariant (interrupts off) afterwards.
+                interrupt_on();
                 asm!("wfi");
+                interrupt_off();
             }
         }
     }

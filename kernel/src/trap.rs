@@ -11,6 +11,24 @@ const SIE_SEIE: usize = 1 << 9;
 const SIE_STIE: usize = 1 << 5;
 const SSTATUS_SIE: usize = 1 << 1;
 
+fn handle_timer_interrupt(tag: &str) {
+    unsafe {
+        // FIX: Kernel/user timer interrupts now share one helper so stimecmp update
+        // and preemption behavior stay consistent across both trap paths.
+        let time = read_csr!(time);
+        print!(
+            "{tag}>time: 0x{:x}, next timer on: 0x{:x}\n",
+            time,
+            time + 1000000
+        );
+        write_csr!(stimecmp, time + 1000000);
+
+        if !(crate::CPU).current.is_null() {
+            (*(crate::CPU).current).yeld();
+        }
+    }
+}
+
 pub fn init_trap() {
     unsafe {
         write_csr!(stvec, kernelvec as *const () as u32);
@@ -144,16 +162,7 @@ extern "C" fn kerneltrap() {
         // Because trap originated in kernel it coudl (what?)
         match scause {
             0x80000005 => {
-                let time = read_csr!(time);
-                print!(
-                    ">time: 0x{:x}, next timer on: 0x{:x}\n",
-                    time,
-                    time + 1000000
-                );
-                write_csr!(stimecmp, time + 1000000);
-                if !(crate::CPU).current.is_null() {
-                    (*(crate::CPU).current).yeld();
-                }
+                handle_timer_interrupt("");
             }
             _ => panic!(),
         }
@@ -200,17 +209,7 @@ pub extern "C" fn usertrap() -> usize {
                 syscall(proc);
             }
             0x80000005 => {
-                let time = read_csr!(time);
-                print!(
-                    "user>time: 0x{:x}, next timer on: 0x{:x}\n",
-                    time,
-                    time + 1000000
-                );
-                write_csr!(stimecmp, time + 1000000);
-                if !(crate::CPU).current.is_null() {
-                    // NOTE: I dont think it's possible for it to be null
-                    (*(crate::CPU).current).yeld();
-                }
+                handle_timer_interrupt("user");
             }
             _ => panic!("user> cause 0x{:x}, val: 0x{:x}", scause, stval),
         }

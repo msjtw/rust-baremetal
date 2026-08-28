@@ -275,11 +275,15 @@ impl PageTable {
                 return None;
             }
             let new_page = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as *mut usize };
-            unsafe { write_bytes(new_page, 0, 1024) };
-            let mut new_pte = Pte::from_addr(new_page as usize);
+            // FIX: Reject null allocations before touching memory.
+            // Prevents OOM null-deref while growing page-table levels.
+            let new_page = NonNull::new(new_page)?;
+
+            unsafe { write_bytes(new_page.as_ptr(), 0, 1024) };
+            let mut new_pte = Pte::from_addr(new_page.as_ptr() as usize);
             new_pte.v = true;
             unsafe { pte_addr.write(new_pte.into()) };
-            a = NonNull::new(new_page)?;
+            a = new_page;
         }
 
         let index = va.vpn(0)?;
@@ -337,19 +341,22 @@ impl PageTable {
         let mut va = virt;
         for _ in 0..(size / PAGESIZE) {
             debug!("unmapping addr: 0x{:x}, size: 0x{:x}", va, size);
-            let pte_addr = match self.walk(va as usize, WalkType::Walk) {
-                Some(x) => x,
-                None => continue,
-            };
-            let pte = Pte::from(unsafe { pte_addr.read() });
-            if !pte.v {
-                continue;
+            if let Some(pte_addr) = self.walk(va as usize, WalkType::Walk) {
+                let pte = Pte::from(unsafe { pte_addr.read() });
+                if pte.v {
+                    let is_leaf = pte.r || pte.w || pte.x;
+
+                    // FIX: Free only user leaf mappings. Kernel/static/device mappings may point
+                    // to non-heap storage and must be unmapped without dealloc.
+                    if free && is_leaf && pte.u {
+                        let page = (pte.ppn << 12) as *mut u8;
+                        unsafe { HEAP_ALLOCATOR.dealloc(page, PAGE_LAYOUT) };
+                    }
+
+                    unsafe { pte_addr.write(0) };
+                }
             }
-            if free {
-                let page = (pte.ppn << 12) as *mut u8;
-                unsafe { HEAP_ALLOCATOR.dealloc(page, PAGE_LAYOUT) };
-            }
-            unsafe { pte_addr.write(0) };
+
             va += PAGESIZE;
         }
         Ok(())
@@ -478,8 +485,12 @@ impl Uvm {
 
     pub fn free(&mut self) {
         debug!("uvm free");
-        self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true).unwrap();
-        self.pagetable.unmap(TRAPFRAME, PAGESIZE, true).unwrap();
+        // FIX: TRAMPOLINE is static code, not heap-owned user memory.
+        // TRAMPOLINE is static kernel text, so only remove the mapping.
+        self.pagetable.unmap(TRAMPOLINE, PAGESIZE, false).unwrap();
+        // FIX: TRAPFRAME storage is owned by Process::trapframe allocation.
+        // TRAPFRAME is owned by Process::trapframe; Uvm only maps it.
+        self.pagetable.unmap(TRAPFRAME, PAGESIZE, false).unwrap();
 
         // this frees all pages in this vm but leaves page tree structure
         self.pagetable.unmap(self.begin, self.size, true).unwrap();
@@ -506,10 +517,28 @@ impl Uvm {
     // it creates virt address space from USERBASE to size
     pub fn alloc(&mut self, size: usize, perm: usize) -> Result<(), ()> {
         while self.size < size {
+            // FIX: Guard pages are address-space holes, not ambiguous valid PTEs.
+            // Guard pages are represented as gaps in VA space (no mapping created).
+            if perm == 0 {
+                self.size += PAGESIZE;
+                continue;
+            }
+
             let page = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as usize };
+            // FIX: Fail cleanly on OOM instead of mapping an invalid frame address.
+            if page == 0 {
+                return Err(());
+            }
             let end = self.end();
-            self.pagetable.map(end, page, PAGESIZE, perm | PTE_U)?;
-            // NOTE: need to free memory on fail
+            if self
+                .pagetable
+                .map(end, page, PAGESIZE, perm | PTE_U)
+                .is_err()
+            {
+                // FIX: Roll back page allocation when map fails to avoid leaks.
+                unsafe { HEAP_ALLOCATOR.dealloc(page as *mut u8, PAGE_LAYOUT) };
+                return Err(());
+            }
             self.size += PAGESIZE
         }
         Ok(())
@@ -523,6 +552,8 @@ impl Uvm {
 
         let newend = USER_START + size;
         self.pagetable.unmap(newend, self.size - size, true)?;
+        // FIX: Keep logical size in sync with unmapped range.
+        self.size = size;
         Ok(())
     }
 
@@ -565,7 +596,9 @@ impl Uvm {
             unsafe {
                 let src_addr = page.as_ptr() as *const u8;
                 let dst_addr = pte.pa as *mut u8;
-                copy_nonoverlapping(src_addr, dst_addr, PAGESIZE);
+                // FIX: Last image chunk can be short; zero-fill then copy exact chunk length.
+                write_bytes(dst_addr, 0, PAGESIZE);
+                copy_nonoverlapping(src_addr, dst_addr, page.len());
             };
             va += PAGESIZE;
         }
@@ -582,7 +615,12 @@ enum WalkType {
 // return physical address for virual
 fn walkaddr(pagetree: &mut PageTable, virt_a: usize) -> Option<usize> {
     let pte = unsafe { pagetree.walk(virt_a, WalkType::Walk).ok_or(()).ok()?.read() };
-    let pa = Pte::from(pte).pa as usize + (virt_a % PAGESIZE as usize);
+    let pte = Pte::from(pte);
+    // FIX: Treat non-leaf/invalid entries as unmapped.
+    if !pte.v || !(pte.r || pte.w || pte.x) {
+        return None;
+    }
+    let pa = pte.pa + (virt_a % PAGESIZE as usize);
     Some(pa)
 }
 

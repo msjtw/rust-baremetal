@@ -31,7 +31,12 @@ impl Cpu {
         if self.interrupt_off_stack == 0 {
             self.interrupt_prev_state = old;
         }
-        self.interrupt_off_stack += 1;
+        // FIX: checked_add prevents silent wraparound that would corrupt lock nesting
+        // and potentially re-enable interrupts while still inside critical sections.
+        self.interrupt_off_stack = self
+            .interrupt_off_stack
+            .checked_add(1)
+            .expect("interrupt_off_stack overflow");
     }
     pub fn pop_interrupt_off(&mut self) {
         if self.interrupt_off_stack < 1 {
