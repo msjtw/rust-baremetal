@@ -16,15 +16,14 @@ use alloc::string::String;
 use alloc::vec;
 use spin::Once;
 
-use core::alloc::GlobalAlloc;
-use core::arch::{asm, global_asm};
+use core::arch::global_asm;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
 
 use crate::kernel::{Cpu, Kernel};
 use crate::trap::init_trap;
 use crate::trap::trampoline::{userret, uservec};
-use crate::virtmemory::{PAGE_LAYOUT, RAMEND};
+use crate::virtmemory::RAMEND;
 
 const PRIME: &[u8] = include_bytes!("../../user/_prime.bin");
 const INIT: &[u8] = include_bytes!("../../user/_init.bin");
@@ -71,7 +70,7 @@ macro_rules! println {
     }};
 }
 
-pub const DEBUG: bool = true;
+static mut DEBUG: bool = false;
 
 #[macro_export]
 macro_rules! debug {
@@ -81,8 +80,10 @@ macro_rules! debug {
         }
     }};
     ($($arg:tt)*) => {{
-        if $crate::DEBUG {
-            $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
+        unsafe{
+            if $crate::DEBUG {
+                $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
+            }
         }
     }};
 }
@@ -116,6 +117,9 @@ pub extern "C" fn main() -> ! {
             .init(ekernel, RAMEND as usize - ekernel);
     }
 
+    unsafe {
+        DEBUG = false;
+    }
 
     init_trap();
     KERNEL.call_once(|| lock::IntMutex::new(Kernel::default()));
@@ -136,10 +140,11 @@ pub extern "C" fn main() -> ! {
 
         // Start init
         let user_p0 = kernel.allocproc().unwrap();
+        unsafe { user_p0.lock.unlock_manual() };
         user_p0.kexec(String::from("init"), vec!["10"]).unwrap();
         user_p0.state = process::ProcState::Runnable;
     }
-
+    // debug!("into the schedulervere");
     process::scheduler();
 }
 

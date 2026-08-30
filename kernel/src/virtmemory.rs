@@ -7,7 +7,10 @@ use core::{
 use alloc::{alloc::Allocator, string::String, vec::Vec};
 
 use crate::{
-    FRAME_ALLOCATOR, HEAP_ALLOCATOR, debug, println, process::{Process, trapframe::Trapframe}, trap::trampoline::_trampoline, uart_print, write_csr
+    FRAME_ALLOCATOR, HEAP_ALLOCATOR, debug, println,
+    process::{Process, trapframe::Trapframe},
+    trap::trampoline::_trampoline,
+    uart_print, write_csr,
 };
 
 unsafe extern "C" {
@@ -208,7 +211,7 @@ impl Default for PageTable {
 impl Drop for PageTable {
     fn drop(&mut self) {
         debug!("dropping pagetable");
-        self.free();
+        // self.free();
     }
 }
 
@@ -231,6 +234,7 @@ impl PageTable {
         // free root
         unsafe { HEAP_ALLOCATOR.dealloc(self.root.as_ptr() as *mut u8, PAGE_LAYOUT) };
     }
+
     fn free_req(root: NonNull<usize>) {
         debug!("removing pt node");
         for i in 0..1024 {
@@ -276,13 +280,15 @@ impl PageTable {
                 return None;
             }
             let new_page = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as *mut usize };
-            unsafe { write_bytes(new_page, 0, 1024) };
-            let mut new_pte = Pte::from_addr(new_page as usize);
+            let new_page = NonNull::new(new_page)?;
+
+            unsafe { write_bytes(new_page.as_ptr(), 0, 1024) };
+            let mut new_pte = Pte::from_addr(new_page.as_ptr() as usize);
             new_pte.v = true;
             let tmp: usize = new_pte.into();
             debug!("new pte: {:?}", tmp);
             unsafe { pte_addr.write(tmp) };
-            a = NonNull::new(new_page)?;
+            a = new_page;
         }
 
         let index = va.vpn(0)?;
@@ -343,30 +349,24 @@ impl PageTable {
         let mut va = virt;
         for _ in 0..(size / PAGESIZE) {
             debug!("unmapping addr: 0x{:x}, size: 0x{:x}", va, size);
-            let pte_addr = match self.walk(va as usize, WalkType::Walk) {
-                Some(x) => x,
-                None => {
-                    debug!("no elo");
-                    continue;
+            if let Some(pte_addr) = self.walk(va as usize, WalkType::Walk) {
+                let pte = Pte::from(unsafe { pte_addr.read() });
+                if pte.v {
+                    let is_leaf = pte.r || pte.w || pte.x;
+
+                    // FIX: Free only user leaf mappings. Kernel/static/device mappings may point
+                    // to non-heap storage and must be unmapped without dealloc.
+                    if free && is_leaf && pte.u {
+                        let page = (pte.ppn << 12) as *mut u8;
+                        unsafe { HEAP_ALLOCATOR.dealloc(page, PAGE_LAYOUT) };
+                    }
+
+                    unsafe { pte_addr.write(0) };
                 }
-            };
-            debug!("got pte_addr :)");
-            let pte = Pte::from(unsafe { pte_addr.read() });
-            if !pte.v {
-                debug!("not vaild");
-                continue;
             }
-            if free {
-                debug!("freeing time");
-                let page = (pte.pa) as *mut u8;
-                debug!("freeing page 0x{:x}", pte.pa);
-                unsafe { HEAP_ALLOCATOR.dealloc(page, PAGE_LAYOUT) };
-                debug! ("im free");
-            }
-            unsafe { pte_addr.write(0) };
+
             va += PAGESIZE;
         }
-        debug!("unmapped");
         Ok(())
     }
 }
@@ -476,7 +476,7 @@ impl Clone for Uvm {
 
 impl Drop for Uvm {
     fn drop(&mut self) {
-        self.free();
+        // self.free();
     }
 }
 
@@ -494,11 +494,11 @@ impl Uvm {
     pub fn free(&mut self) {
         debug!("uvm free");
         debug!("trampoline");
-        self.pagetable.unmap(TRAMPOLINE, PAGESIZE, true).unwrap();
+        self.pagetable.unmap(TRAMPOLINE, PAGESIZE, false).unwrap();
         debug!("trapframe");
-        self.pagetable.unmap(TRAPFRAME, PAGESIZE, true).unwrap();
+        self.pagetable.unmap(TRAPFRAME, PAGESIZE, false).unwrap();
 
-        debug!("text");
+        debug!("text size 0x{:x}", self.size);
         // this frees all pages in this vm but leaves page tree structure
         if self.size > 0 {
             self.pagetable.unmap(self.begin, self.size, true).unwrap();
@@ -526,10 +526,27 @@ impl Uvm {
     // it creates virt address space from USERBASE to size
     pub fn alloc(&mut self, size: usize, perm: usize) -> Result<(), ()> {
         while self.size < size {
+            // NOTE: Gurad pages shoudl not be mapped
+            if perm == 0 {
+                self.size += PAGESIZE;
+                continue;
+            }
+
             let page = unsafe { HEAP_ALLOCATOR.alloc(PAGE_LAYOUT) as usize };
+            // NOTE: OOM Error
+            if page == 0 {
+                return Err(());
+            }
             let end = self.end();
-            self.pagetable.map(end, page, PAGESIZE, perm | PTE_U)?;
-            // NOTE: need to free memory on fail
+            if self
+                .pagetable
+                .map(end, page, PAGESIZE, perm | PTE_U)
+                .is_err()
+            {
+                // NOTE: free memory on fail
+                unsafe { HEAP_ALLOCATOR.dealloc(page as *mut u8, PAGE_LAYOUT) };
+                return Err(());
+            }
             self.size += PAGESIZE
         }
         Ok(())
@@ -543,6 +560,7 @@ impl Uvm {
 
         let newend = USER_START + size;
         self.pagetable.unmap(newend, self.size - size, true)?;
+        self.size = size;
         Ok(())
     }
 
@@ -585,6 +603,7 @@ impl Uvm {
             unsafe {
                 let src_addr = page.as_ptr() as *const u8;
                 let dst_addr = pte.pa as *mut u8;
+                write_bytes(dst_addr, 0, PAGESIZE);
                 copy_nonoverlapping(src_addr, dst_addr, PAGESIZE);
             };
             va += PAGESIZE;
@@ -602,7 +621,11 @@ enum WalkType {
 // return physical address for virual
 fn walkaddr(pagetree: &mut PageTable, virt_a: usize) -> Option<usize> {
     let pte = unsafe { pagetree.walk(virt_a, WalkType::Walk).ok_or(()).ok()?.read() };
-    let pa = Pte::from(pte).pa as usize + (virt_a % PAGESIZE as usize);
+    let pte = Pte::from(pte);
+    if !pte.v || !(pte.r || pte.w || pte.x) {
+        return None;
+    }
+    let pa = pte.pa + (virt_a % PAGESIZE as usize);
     Some(pa)
 }
 

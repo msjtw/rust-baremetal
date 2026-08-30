@@ -1,0 +1,824 @@
+
+OpenSBI v1.8.1
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name               : riscv-virtio,qemu
+Platform Features           : medeleg
+Platform HART Count         : 1
+Platform HART Protection    : pmp
+Platform IPI Device         : aclint-mswi
+Platform Timer Device       : aclint-mtimer @ 10000000Hz
+Platform Console Device     : uart8250
+Platform HSM Device         : ---
+Platform PMU Device         : ---
+Platform Reboot Device      : syscon-reboot
+Platform Shutdown Device    : syscon-poweroff
+Platform Suspend Device     : ---
+Platform CPPC Device        : ---
+Firmware Base               : 0x80000000
+Firmware Size               : 317 KB
+Firmware RW Offset          : 0x40000
+Firmware RW Size            : 61 KB
+Firmware Heap Offset        : 0x46000
+Firmware Heap Size          : 37 KB (total), 0 KB (reserved), 11 KB (used), 25 KB (free)
+Firmware Scratch Size       : 4096 B (total), 1404 B (used), 2692 B (free)
+Runtime SBI Version         : 3.0
+Standard SBI Extensions     : time,rfnc,ipi,base,hsm,srst,pmu,dbcn,fwft,legacy,dbtr,sse
+Experimental SBI Extensions : none
+
+Domain0 Name                : root
+Domain0 Boot HART           : 0
+Domain0 HARTs               : 0*
+Domain0 Region00            : 0x80040000-0x8004ffff M: (F,R,W) S/U: ()
+Domain0 Region01            : 0x80000000-0x8003ffff M: (F,R,X) S/U: ()
+Domain0 Region02            : 0x00100000-0x00100fff M: (I,R,W) S/U: (R,W)
+Domain0 Region03            : 0x10000000-0x10000fff M: (I,R,W) S/U: (R,W)
+Domain0 Region04            : 0x02000000-0x0200ffff M: (I,R,W) S/U: ()
+Domain0 Region05            : 0x0c400000-0x0c5fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region06            : 0x0c000000-0x0c3fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region07            : 0x00000000-0xffffffff M: () S/U: (R,W,X)
+Domain0 Next Address        : 0x80200000
+Domain0 Next Arg1           : 0x87e00000
+Domain0 Next Mode           : S-mode
+Domain0 SysReset            : yes
+Domain0 SysSuspend          : yes
+
+Boot HART ID                : 0
+Boot HART Domain            : root
+Boot HART Priv Version      : v1.12
+Boot HART Base ISA          : rv32imafdch
+Boot HART ISA Extensions    : sstc,zicntr,zihpm,zicboz,zicbom,sdtrig,svadu
+Boot HART PMP Count         : 16
+Boot HART PMP Granularity   : 2 bits
+Boot HART PMP Address Bits  : 32
+Boot HART MHPM Info         : 16 (0x0007fff8)
+Boot HART Debug Triggers    : 2 triggers
+Boot HART MIDELEG           : 0x00001666
+Boot HART MEDELEG           : 0x00f4b509
+kstack: 0xffffc000
+kstack: 0xffff9000
+kstack: 0xffff6000
+kstack: 0xffff3000
+scheduler: interrupt: falsesched locks 0
+>TRAP None sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x27615d, next timer on: 0x36a39d
+switching to process Some(0)
+calculating 1-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(1)
+exec
+1-th prime is: 2
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 2-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(2)
+exec
+2-th prime is: 3
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 3-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(3)
+exec
+3-th prime is: 5
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+>TRAP Some(0) sepc=0x8021d6c0 sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x36f933, next timer on: 0x463b73
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+calculating 4-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(4)
+exec
+4-th prime is: 7
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 5-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(5)
+exec
+5-th prime is: 11
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 6-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(6)
+exec
+6-th prime is: 13
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 7-thuser>time: 0x46431f, next timer on: 0x55855f
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+ prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(7)
+exec
+7-th prime is: 17
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 8-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(8)
+exec
+8-th prime is: 19
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 9-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(9)
+exec
+9-th prime is: 23
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 10-th p>TRAP Some(0) sepc=0x8021b730 sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x55d589, next timer on: 0x6517c9
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+rime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(10)
+exec
+10-th prime is: 29
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 11-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(11)
+exec
+11-th prime is: 31
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 12-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(12)
+exec
+12-th prime isuser>time: 0x652080, next timer on: 0x7462c0
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(12)
+: 37
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 13-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(13)
+exec
+13-th prime is: 41
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 14-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(14)
+exec
+14-th prime is: 43
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 15-th prim>TRAP Some(0) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x74bd02, next timer on: 0x83ff42
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+e: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(15)
+exec
+15-th prime is: 47
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 16-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(16)
+exec
+16-th prime is: 53
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 17-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(17)
+exec
+17-th prime is: 59
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+>TRAP None sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x84619f, next timer on: 0x93a3df
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 18-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(18)
+exec
+18-th prime is: 61
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 19-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(19)
+exec
+19-th prime is: 67
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 20-th prime: 
+>TRAP Some(0) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x940d02, next timer on: 0xa34f42
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(20)
+exec
+20-th prime is: 71
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 21-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(21)
+exec
+21-th prime is: 73
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 22-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(22)
+exec
+22-th prime is: 79
+>TRAP Some(22) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0xa3c43e, next timer on: 0xb3067e
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(22)
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 23-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(23)
+exec
+23-th prime is: 83
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 24-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(24)
+exec
+24-th prime is: 89
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 25-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(25)
+user>time: 0xb313d8, next timer on: 0xc25618
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(25)
+exec
+25-th prime is: 97
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 26-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(26)
+exec
+26-th prime is: 101
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 27-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(27)
+exec
+27-th prime is: 103
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 28-th pri>TRAP Some(0) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0xc2a522, next timer on: 0xd1e762
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+me: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(28)
+exec
+28-th prime is: 107
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 29-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(29)
+exec
+29-th prime is: 109
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 30-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(30)
+exec
+30-th prime is: 113
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 31-th >TRAP Some(0) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0xd2241d, next timer on: 0xe1665d
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(31)
+exec
+31-th prime is: 127
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 32-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(32)
+exec
+32-th prime is: 131
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 33-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(33)
+exec
+33-th prime is: 137
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+>TRAP Some(0) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0xe1be8d, next timer on: 0xf100cd
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+calculating 34-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(34)
+exec
+34-th prime is: 139
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 35-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(35)
+exec
+35-th prime is: 149
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 36-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(36)
+exec
+36-th prime is: 151
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+>TRAP Some(0) sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0xf15511, next timer on: 0x1009751
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+back traps: false depth: 
+scheduler: interrupt: falsesched locks 0
+switching to process Some(0)
+calculating 37-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(37)
+exec
+37-th prime is: 157
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 38-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(38)
+exec
+38-th prime is: 163
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 39-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(39)
+exec
+39-th prime is: 167
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+>TRAP None sepc=0x80218f3c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1013bad, next timer on: 0x1107ded
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 40-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(40)
+exec
+40-th prime is: 173
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 41-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(41)
+exec
+41-th prime is: 179
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(0)
+calculating 42-th prime: 
+fork
+wait
+back traps: false depth: 
+scheduler: interrupt: truesched locks 0
+switching to process Some(42)
+exec
+42-th prime is: 181
+exit
+kexit start false
+wakeup
+kexit end
+back traps: false depth: 
+scheduler: interrupt: true>TRAP None sepc=0x8021ff88 sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x110c8e6, next timer on: 0x1200b26
+sched locks 0
+Something went wrong. PanicInfo { message: called `Option::unwrap()` on a `None` value, location: Location { file: "src/process.rs", line: 437, column: 50 }, can_unwind: true, force_no_backtrace: false }
+QEMU: Terminated
+

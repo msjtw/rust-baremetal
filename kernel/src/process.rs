@@ -13,11 +13,13 @@ use crate::{
     FRAME_ALLOCATOR, KERNEL,
     allocator::FrameAllocator,
     csr::{SSTATUS_SPIE, SSTATUS_SPP},
+    debug,
+    lock::{IntMutex, IntMutexGuard},
     print, println,
     process::trapframe::Trapframe,
     read_csr,
     trap::{
-        interrupt_off, interrupt_on,
+        interrupt_off, interrupt_on, interrupt_read,
         trampoline::{_trampoline, userret, uservec},
         usertrap,
     },
@@ -109,7 +111,7 @@ pub struct Process {
     pub xstatus: u32,
     pub sleep_channel: Option<usize>,
     pub trapframe: Box<Trapframe, &'static FrameAllocator>,
-
+    pub lock: IntMutex<()>,
     pub quants: usize,
 }
 
@@ -126,6 +128,7 @@ impl Process {
             xstatus: 0,
             sleep_channel: None,
             trapframe: Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR),
+            lock: IntMutex::new(()),
             quants: 0,
         })
     }
@@ -139,6 +142,7 @@ impl Process {
         self.xstatus = 0;
         self.sleep_channel = None;
         self.trapframe = Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR);
+        self.lock = IntMutex::new(());
 
         Ok(())
     }
@@ -147,16 +151,14 @@ impl Process {
 
     // NOTE: because yield is a keyword
     pub fn yeld(&mut self) {
+        println!("interrupt: {}", interrupt_read());
+        unsafe { println!("sched locks {}", (crate::CPU).interrupt_off_stack) };
+        unsafe { self.lock.lock_manual() };
+        println!("interrupt: {}", interrupt_read());
+        unsafe { println!("sched locks {}", (crate::CPU).interrupt_off_stack) };
         self.state = ProcState::Runnable;
-        unsafe { self.sched() };
-    }
-
-    unsafe fn sched(&mut self) {
-        unsafe {
-            let interrupt_prev_state = (crate::CPU).interrupt_prev_state;
-            switch(&mut self.context, &mut (crate::CPU).context);
-            (crate::CPU).interrupt_prev_state = interrupt_prev_state;
-        }
+        unsafe { sched(&mut self.context) };
+        unsafe { self.lock.unlock_manual() };
     }
 
     pub fn kfork(&mut self) -> Result<usize, ()> {
@@ -173,10 +175,13 @@ impl Process {
         // and cpid in parent
         self.trapframe.a0 = child_proc.pid.unwrap();
 
+        unsafe { child_proc.lock.unlock_manual() };
         // NOTE: not sure if it's ok
         child_proc.parent = self.pid;
 
+        unsafe { child_proc.lock.lock_manual() };
         child_proc.state = ProcState::Runnable;
+        unsafe { child_proc.lock.unlock_manual() };
 
         child_proc.pid.ok_or(())
     }
@@ -245,53 +250,117 @@ impl Process {
         }
 
         // TODO: close all open files
+        {
+            let lock = IntMutex::new(());
+            let guard = lock.lock();
+            println!("kexit start {}", interrupt_read());
+            // giveup childer to init
+            KERNEL.get().unwrap().lock().reparent(self.pid);
 
-        // giveup childer to init
-        KERNEL.get().unwrap().lock().reparent(self.pid);
+            // wakeup parent
+            KERNEL.get().unwrap().lock().wakeup(self.parent);
 
-        // wakeup parent
-        KERNEL.get().unwrap().lock().wakeup(self.parent);
+            unsafe { self.lock.lock_manual() };
 
-        self.xstatus = xstatus;
-        self.state = ProcState::Zombie;
+            self.xstatus = xstatus;
+            self.state = ProcState::Zombie;
+            println!("kexit end");
+            drop(guard);
+        }
 
-        unsafe { self.sched() };
+        unsafe { sched(&mut self.context) };
         panic!("cordyceps")
     }
 
     pub fn kwait(&mut self, status_addr: usize) -> i32 {
         loop {
+            let parent_pid = self.pid;
             let mut has_kids = false;
+            let mut zombie_pid = None;
+            let mut zombie_xstatus = 0;
 
-            for proc in &mut KERNEL.get().unwrap().lock().process_table {
-                if proc.parent == self.pid {
-                    has_kids = true;
-                    if proc.state == ProcState::Zombie {
-                        if status_addr != 0 {
-                            copy_out(&mut self.pagetable, status_addr, proc.xstatus).unwrap();
+            {
+                // FIX: Hold one kernel lock across child scan and sleep-state publication
+                // so wakeup cannot race between "no zombie found" and "go to sleep".
+                let mut kernel = KERNEL.get().unwrap().lock();
+                let table = &mut kernel.process_table;
+
+                for proc in table.iter_mut() {
+                    if proc.parent == parent_pid {
+                        unsafe { proc.lock.lock_manual() };
+                        has_kids = true;
+                        if proc.state == ProcState::Zombie {
+                            zombie_xstatus = proc.xstatus;
+                            zombie_pid = proc.pid;
+                            proc.free().unwrap();
+                            unsafe { proc.lock.unlock_manual() };
+                            break;
                         }
-                        let pid = proc.pid.expect("pid-less child (what?)") as i32;
-                        proc.free().unwrap();
-                        return pid;
+                        unsafe { proc.lock.unlock_manual() };
                     }
                 }
+
+                if zombie_pid.is_none() && has_kids {
+                    // FIX: Publish sleep fields while lock is held to prevent lost wakeups.
+                    let parent = table
+                        .iter_mut()
+                        .find(|proc| proc.pid == parent_pid)
+                        .expect("waiting process missing from process table");
+                    parent.sleep_channel = parent_pid;
+                    parent.state = ProcState::Sleeping;
+                }
+            }
+
+            if let Some(pid) = zombie_pid {
+                if status_addr != 0 {
+                    copy_out(&mut self.pagetable, status_addr, zombie_xstatus).unwrap();
+                }
+                return pid as i32;
             }
 
             if !has_kids {
                 println!("no kids");
                 return -1;
             }
+
             self.sleep(self.pid);
         }
     }
-
+    // pub fn kwait(&mut self, status_addr: usize) -> i32 {
+    //     loop {
+    //         let mut has_kids = false;
+    //
+    //         for proc in &mut KERNEL.get().unwrap().lock().process_table {
+    //             if proc.parent == self.pid {
+    //                 has_kids = true;
+    //                 if proc.state == ProcState::Zombie {
+    //                     if status_addr != 0 {
+    //                         copy_out(&mut self.pagetable, status_addr, proc.xstatus).unwrap();
+    //                     }
+    //                     let pid = proc.pid.expect("pid-less child (what?)") as i32;
+    //                     proc.free().unwrap();
+    //                     return pid;
+    //                 }
+    //             }
+    //         }
+    //
+    //         if !has_kids {
+    //             println!("no kids");
+    //             return -1;
+    //         }
+    //         self.sleep(self.pid);
+    //     }
+    // }
+    //
     fn sleep(&mut self, channel: Option<usize>) {
+        unsafe { self.lock.lock_manual() };
         self.sleep_channel = channel;
         self.state = ProcState::Sleeping;
 
-        unsafe { self.sched() };
+        unsafe { sched(&mut self.context) };
 
-        self.sleep_channel = None
+        self.sleep_channel = None;
+        unsafe { self.lock.unlock_manual() };
     }
 }
 
@@ -334,16 +403,38 @@ unsafe extern "C" fn switch(from: &mut Context, to: &mut Context) {
     );
 }
 
+unsafe fn sched(context: &mut Context) {
+    unsafe {
+        if interrupt_read() {
+            panic!("sched with interrupts enabled ")
+        }
+
+        if (crate::CPU).interrupt_off_stack != 1 {
+            panic!("sched locks {}", (crate::CPU).interrupt_off_stack)
+        }
+        if (*crate::CPU.current).state == ProcState::Running {
+            panic!("sched running")
+        }
+
+        let interrupt_prev_state = (crate::CPU).interrupt_prev_state;
+        switch(context, &mut (crate::CPU).context);
+        (crate::CPU).interrupt_prev_state = interrupt_prev_state;
+    }
+}
+
 pub fn scheduler() -> ! {
     loop {
-        let mut found = false;
         print!("scheduler: ");
+        print!("interrupt: {}", interrupt_read());
+        unsafe { println!("sched locks {}", (crate::CPU).interrupt_off_stack) };
+
+        let mut found = ptr::null_mut();
         unsafe {
-            // interrupt_on();
-            // interrupt_off();
+            interrupt_on();
+            interrupt_off();
         }
         {
-            let mut kernel = KERNEL.get().unwrap().lock();
+            let mut kernel = crate::KERNEL.get().unwrap().lock();
             let table = &mut kernel.process_table;
             let mut order: Vec<usize> = (0..table.len()).collect();
 
@@ -352,25 +443,31 @@ pub fn scheduler() -> ! {
             for i in order {
                 let proc = &mut table[i];
 
+                unsafe { proc.lock.lock_manual() };
                 if proc.state == ProcState::Runnable {
                     proc.state = ProcState::Running;
-                    found = true;
+                    found = proc as *mut Process;
 
-                    unsafe {
-                        crate::CPU.current = proc as *mut Process;
-                    }
 
                     break;
                 }
+                unsafe { proc.lock.unlock_manual() };
             }
         }
 
-        if found {
+        if !found.is_null() {
             unsafe {
-                (*crate::CPU.current).quants += 1;
-                println!("switching to process {:?}", (*crate::CPU.current).pid);
-                switch(&mut crate::CPU.context, &mut (*crate::CPU.current).context);
+                (*found).quants += 1;
+                crate::CPU.current = found;
+                println!("switching to process {:?}", (*found).pid);
+                switch(&mut crate::CPU.context, &mut (*found).context);
+                println!(
+                    "back traps: {} depth: ",
+                    interrupt_read(),
+                    // crate::CPU.interrupt_off_stack
+                );
                 crate::CPU.current = ptr::null_mut();
+                (*found).lock.unlock_manual();
             }
         } else {
             println!("no processes found");
@@ -383,8 +480,11 @@ pub fn scheduler() -> ! {
 
 // allocproc sets this as ra for new processes
 pub fn forkret() {
-    // TODO: exec first proc (init) here (or not)
     let proc = unsafe { &mut (*crate::CPU.current) };
+
+    unsafe { proc.lock.unlock_manual() };
+
+    // TODO: exec first proc (init) here (or not)
 
     prepare_return(proc);
     let satp = proc.pagetable.get_satp().into();

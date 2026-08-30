@@ -3,7 +3,10 @@ pub mod syscall;
 use alloc::{boxed::Box, vec::Vec};
 
 use crate::{
-    FRAME_ALLOCATOR, KSTACK, print, println, process::{Context, KERNEL_STACK_PAGES, ProcState, Process, forkret, trapframe::Trapframe}, trap::{interrupt_off, interrupt_on, interrupt_read}, virtmemory::{self, Kvm, PAGESIZE}
+    FRAME_ALLOCATOR, KSTACK, debug, print, println,
+    process::{Context, KERNEL_STACK_PAGES, ProcState, Process, forkret, trapframe::Trapframe},
+    trap::{interrupt_off, interrupt_on, interrupt_read},
+    virtmemory::{self, Kvm, PAGESIZE},
 };
 
 // Holds current execution state
@@ -32,12 +35,14 @@ impl Cpu {
             self.interrupt_prev_state = old;
         }
         self.interrupt_off_stack += 1;
+        // debug!("off stack: {}", self.interrupt_off_stack);
     }
     pub fn pop_interrupt_off(&mut self) {
         if self.interrupt_off_stack < 1 {
             panic!("pop interrupt; empty stack")
         }
         self.interrupt_off_stack -= 1;
+        // debug!("off stack: {}", self.interrupt_off_stack);
         if self.interrupt_off_stack == 0 && self.interrupt_prev_state {
             unsafe { interrupt_on() };
         }
@@ -78,6 +83,7 @@ impl Kernel {
                 self.pid += 1;
                 p.state = ProcState::Used;
                 p.trapframe = Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR);
+                unsafe { p.lock.lock_manual() };
 
                 // get empty user page table
                 // let pagetable = Uvm::new(p).unwrap();
@@ -111,9 +117,16 @@ impl Kernel {
     }
 
     pub fn wakeup(&mut self, channel: Option<usize>) {
-        for proc in &mut self.process_table {
-            if proc.state == ProcState::Sleeping && proc.sleep_channel == channel {
-                proc.state = ProcState::Runnable;
+        unsafe {
+            println!("wakeup");
+            for proc in &mut self.process_table {
+                if proc.pid != (*crate::CPU.current).pid {
+                    proc.lock.lock_manual();
+                    if proc.state == ProcState::Sleeping && proc.sleep_channel == channel {
+                        proc.state = ProcState::Runnable;
+                    }
+                    proc.lock.unlock_manual();
+                }
             }
         }
     }

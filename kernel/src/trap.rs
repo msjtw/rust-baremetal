@@ -3,8 +3,7 @@ pub mod trampoline;
 use core::arch::naked_asm;
 
 use crate::{
-    csr::SSTATUS_SPP, kernel::syscall::syscall, print, println, process::prepare_return, read_csr,
-    write_csr,
+    csr::SSTATUS_SPP, debug, kernel::syscall::syscall, print, println, process::prepare_return, read_csr, write_csr
 };
 
 const SIE_SEIE: usize = 1 << 9;
@@ -132,14 +131,16 @@ extern "C" fn kerneltrap() {
         }
 
         let mut pid = None;
-        if !(crate::CPU).current.is_null() {
-            pid = (*(crate::CPU).current).pid;
+        if !(crate::CPU.current).is_null() {
+            pid = (*crate::CPU.current).pid;
         }
 
-        print!(
-            ">TRAP {:?} sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x} stval=0x{:x}\n",
+        println!(
+            ">TRAP {:?} sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x} stval=0x{:x}",
             pid, sepc, sstatus, scause, stval,
         );
+        // println!(">TRAP interrupt: {}", interrupt_read());
+        // println!(">TRAP sched locks {}", (crate::CPU).interrupt_off_stack);
 
         // Because trap originated in kernel it coudl (what?)
         match scause {
@@ -151,8 +152,9 @@ extern "C" fn kerneltrap() {
                     time + 1000000
                 );
                 write_csr!(stimecmp, time + 1000000);
-                if !(crate::CPU).current.is_null() {
-                    (*(crate::CPU).current).yeld();
+                if !crate::CPU.current.is_null() {
+                    println!("yelding");
+                    (*crate::CPU.current).yeld();
                 }
             }
             _ => panic!(),
@@ -169,17 +171,26 @@ pub extern "C" fn usertrap() -> usize {
         let sstatus = read_csr!(sstatus);
         let scause = read_csr!(scause);
         let stval = read_csr!(stval);
-        let proc = &mut (*(crate::CPU).current);
+        if crate::CPU.current.is_null() {
+            panic!("null current")
+        }
+        let proc = &mut (*crate::CPU.current);
+
         // kernel = &mut crate::CPU;
 
         if (sstatus & SSTATUS_SPP as usize) != 0 {
-            panic!("kerneltrap: not from user mode");
+            panic!("usertrap: not from user mode");
+        }
+        if interrupt_read() {
+            panic!("usertrap: interrupts enabled");
         }
 
-        // println!(
-        //     "user>pid {:?} TRAP sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x}",
-        //     proc.pid, sepc, sstatus, scause
-        // );
+        debug!(
+            "user>pid {:?} TRAP sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x}",
+            proc.pid, sepc, sstatus, scause
+        );
+        debug!("user> interrupt: {}", interrupt_read());
+        debug!("user> sched locks {}", (crate::CPU).interrupt_off_stack);
 
         // switch to kernel trap
         let kernelvec = kernelvec as *const () as u32;
@@ -197,7 +208,7 @@ pub extern "C" fn usertrap() -> usize {
                 // it will immidiatly trap to kernelvec and mess up sp.
                 interrupt_on();
 
-                syscall(proc);
+                syscall(&mut (*crate::CPU.current));
             }
             0x80000005 => {
                 let time = read_csr!(time);
@@ -207,10 +218,7 @@ pub extern "C" fn usertrap() -> usize {
                     time + 1000000
                 );
                 write_csr!(stimecmp, time + 1000000);
-                if !(crate::CPU).current.is_null() {
-                    // NOTE: I dont think it's possible for it to be null
-                    (*(crate::CPU).current).yeld();
-                }
+                proc.yeld();
             }
             _ => panic!("user> cause 0x{:x}, val: 0x{:x}", scause, stval),
         }

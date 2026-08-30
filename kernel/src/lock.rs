@@ -1,14 +1,10 @@
 use core::ops::{Deref, DerefMut};
 use spin::{Mutex, MutexGuard};
 
-use crate::{debug, uart_print};
-
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct IntMutex<T>(Mutex<T>);
 
-pub struct IntMutexGuard<'a, T> {
-    guard: Option<MutexGuard<'a, T>>,
-}
+pub struct IntMutexGuard<'a, T>(Option<MutexGuard<'a, T>>);
 
 impl<T> IntMutex<T> {
     pub const fn new(value: T) -> Self {
@@ -18,13 +14,30 @@ impl<T> IntMutex<T> {
     pub fn lock(&self) -> IntMutexGuard<'_, T> {
         unsafe { crate::CPU.push_interrupt_off() };
 
-        unsafe { crate::CPU.push_interrupt_off() };
-
         let guard = self.0.lock();
 
         // uart_print("MUTEX LOCKED\n");
 
-        IntMutexGuard { guard: Some(guard) }
+        IntMutexGuard(Some(guard))
+    }
+
+    pub unsafe fn lock_manual(&self) {
+        unsafe {
+            crate::CPU.push_interrupt_off();
+
+            let guard = self.0.lock();
+
+            // Do NOT let MutexGuard::drop() unlock the mutex.
+            core::mem::forget(guard);
+        }
+    }
+
+    pub unsafe fn unlock_manual(&self) {
+        unsafe {
+            self.0.force_unlock();
+
+            crate::CPU.pop_interrupt_off();
+        }
     }
 }
 
@@ -32,19 +45,19 @@ impl<T> Deref for IntMutexGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        self.guard.as_ref().unwrap().deref()
+        self.0.as_ref().unwrap().deref()
     }
 }
 
 impl<T> DerefMut for IntMutexGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
-        self.guard.as_mut().unwrap().deref_mut()
+        self.0.as_mut().unwrap().deref_mut()
     }
 }
 
 impl<T> Drop for IntMutexGuard<'_, T> {
     fn drop(&mut self) {
-        drop(self.guard.take());
+        self.0.take();
 
         unsafe { crate::CPU.pop_interrupt_off() };
 
