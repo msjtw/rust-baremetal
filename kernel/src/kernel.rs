@@ -119,17 +119,12 @@ impl Kernel {
     pub fn wakeup(&mut self, channel: Option<usize>) {
         unsafe {
             println!("wakeup");
-            if crate::CPU.current.is_null() {
-                return;
-            }
             for proc in &mut self.process_table {
-                if proc.pid != (*crate::CPU.current).pid {
-                    proc.lock.lock_manual();
-                    if proc.state == ProcState::Sleeping && proc.sleep_channel == channel {
-                        proc.state = ProcState::Runnable;
-                    }
-                    proc.lock.unlock_manual();
+                proc.lock.lock_manual();
+                if proc.state == ProcState::Sleeping && proc.sleep_channel == channel {
+                    proc.state = ProcState::Runnable;
                 }
+                proc.lock.unlock_manual();
             }
         }
     }

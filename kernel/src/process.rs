@@ -277,6 +277,7 @@ impl Process {
             let mut has_kids = false;
             let mut zombie_pid = None;
             let mut zombie_xstatus = 0;
+            let mut parent_locked_for_sleep = false;
 
             {
                 // FIX: Hold one kernel lock across child scan and sleep-state publication
@@ -300,13 +301,16 @@ impl Process {
                 }
 
                 if zombie_pid.is_none() && has_kids {
-                    // FIX: Publish sleep fields while lock is held to prevent lost wakeups.
+                    // Hold the parent lock while publishing sleep state so wakeup() cannot
+                    // race in between and be lost before we call sched().
                     let parent = table
                         .iter_mut()
                         .find(|proc| proc.pid == parent_pid)
                         .expect("waiting process missing from process table");
+                    unsafe { parent.lock.lock_manual() };
                     parent.sleep_channel = parent_pid;
                     parent.state = ProcState::Sleeping;
+                    parent_locked_for_sleep = true;
                 }
             }
 
@@ -322,7 +326,11 @@ impl Process {
                 return -1;
             }
 
-            self.sleep(self.pid);
+            if parent_locked_for_sleep {
+                unsafe { sched(&mut self.context) };
+                self.sleep_channel = None;
+                unsafe { self.lock.unlock_manual() };
+            }
         }
     }
     // pub fn kwait(&mut self, status_addr: usize) -> i32 {
