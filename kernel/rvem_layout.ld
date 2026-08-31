@@ -41,7 +41,7 @@ SECTIONS {
   } > ram
 
   . = ALIGN(0x1000); 
-  . = . + 0x1000;
+  . = . + 0x8000;
   PROVIDE(_STACK_PTR = .);
   /* . = . + 32; */
   . = ALIGN(0x1000); 

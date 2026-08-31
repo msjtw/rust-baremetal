@@ -142,7 +142,6 @@ impl Process {
         self.xstatus = 0;
         self.sleep_channel = None;
         self.trapframe = Box::new_in(Trapframe::default(), &FRAME_ALLOCATOR);
-        self.lock = IntMutex::new(());
 
         Ok(())
     }

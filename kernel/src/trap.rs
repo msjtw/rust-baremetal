@@ -3,7 +3,7 @@ pub mod trampoline;
 use core::arch::naked_asm;
 
 use crate::{
-    csr::SSTATUS_SPP, debug, kernel::syscall::syscall, print, println, process::prepare_return, read_csr, write_csr
+    csr::SSTATUS_SPP, debug, kprint, kprintln, kernel::syscall::syscall, print, println, process::prepare_return, read_csr, write_csr
 };
 
 const SIE_SEIE: usize = 1 << 9;
@@ -135,25 +135,21 @@ extern "C" fn kerneltrap() {
             pid = (*crate::CPU.current).pid;
         }
 
-        println!(
+        kprintln!(
             ">TRAP {:?} sepc=0x{:08x} sstatus=0b{:b} scause=0x{:x} stval=0x{:x}",
             pid, sepc, sstatus, scause, stval,
         );
-        // println!(">TRAP interrupt: {}", interrupt_read());
-        // println!(">TRAP sched locks {}", (crate::CPU).interrupt_off_stack);
+        // kprintln!(">TRAP interrupt: {}", interrupt_read());
+        // kprintln!(">TRAP sched locks {}", (crate::CPU).interrupt_off_stack);
 
         // Because trap originated in kernel it coudl (what?)
         match scause {
             0x80000005 => {
                 let time = read_csr!(time);
-                print!(
-                    ">time: 0x{:x}, next timer on: 0x{:x}\n",
-                    time,
-                    time + 1000000
-                );
+                kprintln!(">time: 0x{:x}, next timer on: 0x{:x}", time, time + 1000000);
                 write_csr!(stimecmp, time + 1000000);
                 if !crate::CPU.current.is_null() {
-                    println!("yelding");
+                    kprintln!("yelding");
                     (*crate::CPU.current).yeld();
                 }
             }

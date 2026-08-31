@@ -9,6 +9,7 @@ mod kernel;
 pub mod lock;
 mod process;
 mod trap;
+pub mod uart;
 pub mod virtmemory;
 
 extern crate alloc;
@@ -18,7 +19,6 @@ use spin::Once;
 
 use core::arch::global_asm;
 use core::panic::PanicInfo;
-use core::ptr::write_volatile;
 
 use crate::kernel::{Cpu, Kernel};
 use crate::trap::init_trap;
@@ -56,17 +56,17 @@ global_asm!(
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::uart_print(&alloc::format!($($arg)*));
+        $crate::uart::uart_print(&alloc::format!($($arg)*));
     }};
 }
 
 #[macro_export]
 macro_rules! println {
     () => {{
-        $crate::uart_print("\n");
+        $crate::uart::uart_print("\n");
     }};
     ($($arg:tt)*) => {{
-        $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
+        $crate::uart::uart_print(&alloc::format!("{}", alloc::format!($($arg)*)));
     }};
 }
 
@@ -82,19 +82,27 @@ macro_rules! debug {
     ($($arg:tt)*) => {{
         unsafe{
             if $crate::DEBUG {
-                $crate::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
+                $crate::uart::uart_print(&alloc::format!("{}", alloc::format!($($arg)*)));
             }
         }
     }};
 }
 
-pub fn uart_print(message: &str) {
-    let uart = virtmemory::UART as *mut u8;
-    for c in message.bytes() {
-        unsafe {
-            write_volatile(uart, c);
-        }
-    }
+/// Safe to call from trap/interrupt handlers: uses a stack buffer, no heap, no mutex.
+#[macro_export]
+macro_rules! kprint {
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let mut w = $crate::uart::UartWriter::new();
+        let _ = core::write!(w, $($arg)*);
+        w.flush();
+    }};
+}
+
+#[macro_export]
+macro_rules! kprintln {
+    () => { $crate::kprint!("\n") };
+    ($($arg:tt)*) => {{ $crate::kprint!($($arg)*); $crate::kprint!("\n"); }};
 }
 
 // FIX: Stack guard pages don't work,

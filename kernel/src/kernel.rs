@@ -119,6 +119,9 @@ impl Kernel {
     pub fn wakeup(&mut self, channel: Option<usize>) {
         unsafe {
             println!("wakeup");
+            if crate::CPU.current.is_null() {
+                return;
+            }
             for proc in &mut self.process_table {
                 if proc.pid != (*crate::CPU.current).pid {
                     proc.lock.lock_manual();
