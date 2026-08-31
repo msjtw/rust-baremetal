@@ -471,6 +471,7 @@ pub fn scheduler() -> ! {
         } else {
             println!("no processes found");
             unsafe {
+                interrupt_on();
                 asm!("wfi");
             }
         }
