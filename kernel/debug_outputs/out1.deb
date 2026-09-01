@@ -1,134 +1,441 @@
-
-OpenSBI v1.8.1
-   ____                    _____ ____ _____
-  / __ \                  / ____|  _ \_   _|
- | |  | |_ __   ___ _ __ | (___ | |_) || |
- | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
- | |__| | |_) |  __/ | | |____) | |_) || |_
-  \____/| .__/ \___|_| |_|_____/|____/_____|
-        | |
-        |_|
-
-Platform Name               : riscv-virtio,qemu
-Platform Features           : medeleg
-Platform HART Count         : 1
-Platform HART Protection    : pmp
-Platform IPI Device         : aclint-mswi
-Platform Timer Device       : aclint-mtimer @ 10000000Hz
-Platform Console Device     : uart8250
-Platform HSM Device         : ---
-Platform PMU Device         : ---
-Platform Reboot Device      : syscon-reboot
-Platform Shutdown Device    : syscon-poweroff
-Platform Suspend Device     : ---
-Platform CPPC Device        : ---
-Firmware Base               : 0x80000000
-Firmware Size               : 317 KB
-Firmware RW Offset          : 0x40000
-Firmware RW Size            : 61 KB
-Firmware Heap Offset        : 0x46000
-Firmware Heap Size          : 37 KB (total), 0 KB (reserved), 11 KB (used), 25 KB (free)
-Firmware Scratch Size       : 4096 B (total), 1404 B (used), 2692 B (free)
-Runtime SBI Version         : 3.0
-Standard SBI Extensions     : time,rfnc,ipi,base,hsm,srst,pmu,dbcn,fwft,legacy,dbtr,sse
-Experimental SBI Extensions : none
-
-Domain0 Name                : root
-Domain0 Boot HART           : 0
-Domain0 HARTs               : 0*
-Domain0 Region00            : 0x80040000-0x8004ffff M: (F,R,W) S/U: ()
-Domain0 Region01            : 0x80000000-0x8003ffff M: (F,R,X) S/U: ()
-Domain0 Region02            : 0x00100000-0x00100fff M: (I,R,W) S/U: (R,W)
-Domain0 Region03            : 0x10000000-0x10000fff M: (I,R,W) S/U: (R,W)
-Domain0 Region04            : 0x02000000-0x0200ffff M: (I,R,W) S/U: ()
-Domain0 Region05            : 0x0c400000-0x0c5fffff M: (I,R,W) S/U: (R,W)
-Domain0 Region06            : 0x0c000000-0x0c3fffff M: (I,R,W) S/U: (R,W)
-Domain0 Region07            : 0x00000000-0xffffffff M: () S/U: (R,W,X)
-Domain0 Next Address        : 0x80200000
-Domain0 Next Arg1           : 0x87e00000
-Domain0 Next Mode           : S-mode
-Domain0 SysReset            : yes
-Domain0 SysSuspend          : yes
-
-Boot HART ID                : 0
-Boot HART Domain            : root
-Boot HART Priv Version      : v1.12
-Boot HART Base ISA          : rv32imafdch
-Boot HART ISA Extensions    : sstc,zicntr,zihpm,zicboz,zicbom,sdtrig,svadu
-Boot HART PMP Count         : 16
-Boot HART PMP Granularity   : 2 bits
-Boot HART PMP Address Bits  : 32
-Boot HART MHPM Info         : 16 (0x0007fff8)
-Boot HART Debug Triggers    : 2 triggers
-Boot HART MIDELEG           : 0x00001666
-Boot HART MEDELEG           : 0x00f4b509
-Hello world
-
-new pagetable :)
-new pte: 537464833
-new pte: 537465857
-new pte: 537466881
-new pte: 537467905
-new pte: 537468929
-new pte: 537469953
-new pte: 537470977
-new pte: 537472001
-new pte: 537473025
-new pte: 537474049
-new pte: 537475073
-new pte: 537476097
-new pte: 537477121
-new pte: 537478145
-new pte: 537479169
-new pte: 537480193
-new pte: 537481217
-0x80243ffc
-0
-new pte: 537482241
-pte_addr: 0x80255ff8
-mapping 0xffffe000 -> 0x80235000
-new pagetable :)
-mapping 0xffffc000 -> 0x80258000
-mapping 0xffffd000 -> 0x80259000
-kstack: 0xffffc000
-new pagetable :)
-mapping 0xffff9000 -> 0x8025d000
-mapping 0xffffa000 -> 0x8025e000
-kstack: 0xffff9000
-new pagetable :)
-mapping 0xffff6000 -> 0x80261000
-mapping 0xffff7000 -> 0x80262000
-kstack: 0xffff6000
-new pagetable :)
-mapping 0xffff3000 -> 0x80265000
-mapping 0xffff4000 -> 0x80266000
-kstack: 0xffff3000
-Virt started
-
-new pagetable :)
-0x80257ffc
-0
-new pte: 537501697
-pte_addr: 0x80268ff8
-mapping 0xffffe000 -> 0x80235000
-mapping 0xffffd000 -> 0x80267000
-new pte: 537503745
-mapping 0x10000 -> 0x80269000
-mapping 0x12000 -> 0x8026b000
-uvm free
-trampoline
-freeing virt: 0xffffe000 size 0x1000
-unmapping addr: 0xffffe000, size: 0x1000
-0x80256ffc
-0
-trapframe
-freeing virt: 0xffffd000 size 0x1000
-unmapping addr: 0xffffd000, size: 0x1000
-text size 0x0
-dropping pagetable
-removing pt node
-scheduler: >TRAP None sepc=0x80218c4c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
->time: 0x150664, next timer on: 0x2448a4
-Something went wrong. PanicInfo { message: called `Option::unwrap()` on a `None` value, location: Location { file: "src/process.rs", line: 400, column: 50 }, can_unwind: true, force_no_backtrace: false }
-QEMU: Terminated
-
+...truncated
+>TRAP None sepc=0x8021c708 sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1b76a0a6, next timer on: 0x1b85e2e6
+scheduler: switching to process Some(2185)
+2185-th prime is: 19267
+scheduler: switching to process Some(0)
+calculating 2186-th prime: 
+scheduler: switching to process Some(2186)
+2186-th prime is: 19273
+scheduler: switching to process Some(0)
+calculating 2187-th prime: 
+scheduler: switching to process Some(2187)
+2187-th prime is: 19289
+scheduler: switching to process Some(0)
+calculating 2188-th prime: 
+scheduler: switching to process Some(2188)
+2188-th prime is: 19301
+scheduler: switching to process Some(0)
+calculating 2189-th prime: 
+scheduler: switching to process Some(2189)
+>TRAP Some(2189) sepc=0x80210f1c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1b860222, next timer on: 0x1b954462
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2189)
+2189-th prime is: 19309
+scheduler: switching to process Some(0)
+calculating 2190-th prime: 
+scheduler: switching to process Some(2190)
+2190-th prime is: 19319
+scheduler: switching to process Some(0)
+calculating 2191-th prime: 
+scheduler: switching to process Some(2191)
+2191-th prime is: 19333
+scheduler: switching to process Some(0)
+calculating 2192-th prime: 
+scheduler: switching to process Some(2192)
+2192-th prime is: 19373
+scheduler: switching to process Some(0)
+calculating 2193-th prime: 
+scheduler: switching to process Some(2193)
+>TRAP Some(2193) sepc=0x80210efc sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1b955eb6, next timer on: 0x1ba4a0f6
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2193)
+2193-th prime is: 19379
+scheduler: switching to process Some(0)
+calculating 2194-th prime: 
+scheduler: switching to process Some(2194)
+2194-th prime is: 19381
+scheduler: switching to process Some(0)
+calculating 2195-th prime: 
+scheduler: switching to process Some(2195)
+2195-th prime is: 19387
+scheduler: switching to process Some(0)
+calculating 2196-th prime: 
+scheduler: switching to process Some(2196)
+2196-th prime is: 19391
+scheduler: switching to process Some(0)
+calculating 2197-th prime: 
+scheduler: switching to process Some(2197)
+user>time: 0x1ba4aa7e, next timer on: 0x1bb3ecbe
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2197)
+2197-th prime is: 19403
+scheduler: switching to process Some(0)
+calculating 2198-th prime: 
+scheduler: switching to process Some(2198)
+2198-th prime is: 19417
+scheduler: switching to process Some(0)
+calculating 2199-th prime: 
+scheduler: switching to process Some(2199)
+2199-th prime is: 19421
+scheduler: switching to process Some(0)
+calculating 2200-th prime: 
+scheduler: switching to process Some(2200)
+2200-th prime is: 19423
+scheduler: switching to process Some(0)
+calculating 2201-th >TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1bb40c2d, next timer on: 0x1bc34e6d
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+prime: 
+scheduler: switching to process Some(2201)
+2201-th prime is: 19427
+scheduler: switching to process Some(0)
+calculating 2202-th prime: 
+scheduler: switching to process Some(2202)
+2202-th prime is: 19429
+scheduler: switching to process Some(0)
+calculating 2203-th prime: 
+scheduler: switching to process Some(2203)
+2203-th prime is: 19433
+scheduler: switching to process Some(0)
+calculating 2204-th prime: 
+scheduler: switching to process Some(2204)
+2>TRAP Some(2204) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1bc36fee, next timer on: 0x1bd2b22e
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2204)
+204-th prime is: 19441
+scheduler: switching to process Some(0)
+calculating 2205-th prime: 
+scheduler: switching to process Some(2205)
+2205-th prime is: 19447
+scheduler: switching to process Some(0)
+calculating 2206-th prime: 
+scheduler: switching to process Some(2206)
+2206-th prime is: 19457
+scheduler: switching to process Some(0)
+calculating 2207-th prime: 
+scheduler: switching to process Some(2207)
+2207-th prime is: 19463
+scheduler: switching to process Some(0)
+calculating 220>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1bd2d72e, next timer on: 0x1be2196e
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+8-th prime: 
+scheduler: switching to process Some(2208)
+2208-th prime is: 19469
+scheduler: switching to process Some(0)
+calculating 2209-th prime: 
+scheduler: switching to process Some(2209)
+2209-th prime is: 19471
+scheduler: switching to process Some(0)
+calculating 2210-th prime: 
+scheduler: switching to process Some(2210)
+2210-th prime is: 19477
+scheduler: switching to process Some(0)
+calculating 2211-th prime: 
+scheduler: switching to process Some(2211)
+user>time: 0x1be22049, next timer on: 0x1bf16289
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2211)
+2211-th prime is: 19483
+scheduler: switching to process Some(0)
+calculating 2212-th prime: 
+scheduler: switching to process Some(2212)
+2212-th prime is: 19489
+scheduler: switching to process Some(0)
+calculating 2213-th prime: 
+scheduler: switching to process Some(2213)
+2213-th prime is: 19501
+scheduler: switching to process Some(0)
+calculating 2214-th prime: 
+scheduler: switching to process Some(2214)
+2214-th prime is: 19507
+scheduler: switching to process Some(0)
+calculating 2215-th prime: 
+>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1bf1b8d2, next timer on: 0x1c00fb12
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+scheduler: switching to process Some(2215)
+2215-th prime is: 19531
+scheduler: switching to process Some(0)
+calculating 2216-th prime: 
+scheduler: switching to process Some(2216)
+2216-th prime is: 19541
+scheduler: switching to process Some(0)
+calculating 2217-th prime: 
+scheduler: switching to process Some(2217)
+2217-th prime is: 19543
+scheduler: switching to process Some(0)
+calculating 2218-th prime: 
+scheduler: switching to process Some(2218)
+2218-th prime is: 19553
+scheduler: switching to process Some(0)
+>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c017b37, next timer on: 0x1c10bd77
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+calculating 2219-th prime: 
+scheduler: switching to process Some(2219)
+2219-th prime is: 19559
+scheduler: switching to process Some(0)
+calculating 2220-th prime: 
+scheduler: switching to process Some(2220)
+2220-th prime is: 19571
+scheduler: switching to process Some(0)
+calculating 2221-th prime: 
+scheduler: switching to process Some(2221)
+2221-th prime is: 19577
+scheduler: switching to process Some(0)
+calculating 2222-th prime: 
+scheduler: switching to process Some(2222)
+2222-th prime is: 19583
+scheduler: switching to process Some(0)
+calculating 2223-th prime: 
+>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c112d15, next timer on: 0x1c206f55
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+scheduler: switching to process Some(2223)
+2223-th prime is: 19597
+scheduler: switching to process Some(0)
+calculating 2224-th prime: 
+scheduler: switching to process Some(2224)
+2224-th prime is: 19603
+scheduler: switching to process Some(0)
+calculating 2225-th prime: 
+scheduler: switching to process Some(2225)
+2225-th prime is: 19609
+scheduler: switching to process Some(0)
+calculating 2226-th prime: 
+scheduler: switching to process Some(2226)
+2226-th prime is: 19661
+scheduler: switching to process Some(0)
+calculating 2227-th prime: 
+scheduler: switching to process Some(2227)
+user>time: 0x1c2075ce, next timer on: 0x1c2fb80e
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2227)
+2227-th prime is: 19681
+scheduler: switching to process Some(0)
+calculating 2228-th prime: 
+scheduler: switching to process Some(2228)
+2228-th prime is: 19687
+scheduler: switching to process Some(0)
+calculating 2229-th prime: 
+scheduler: switching to process Some(2229)
+2229-th prime is: 19697
+scheduler: switching to process Some(0)
+calculating 2230-th prime: 
+scheduler: switching to process Some(2230)
+2230-th prime is: 19699
+scheduler: switching to process Some(0)
+calculating 2231-th prime: 
+scheduler: switching to process Some(2231)
+2231-th prime is: 19709
+scheduler: switching to process Some(0)
+>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c3057a8, next timer on: 0x1c3f99e8
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+calculating 2232-th prime: 
+scheduler: switching to process Some(2232)
+2232-th prime is: 19717
+scheduler: switching to process Some(0)
+calculating 2233-th prime: 
+scheduler: switching to process Some(2233)
+2233-th prime is: 19727
+scheduler: switching to process Some(0)
+calculating 2234-th prime: 
+scheduler: switching to process Some(2234)
+2234-th prime is: 19739
+scheduler: switching to process Some(0)
+calculating 2235-th prime: 
+scheduler: switching to process Some(2235)
+2235-th prime is: 19751
+scheduler: switching to process Some(0)
+calculating 2236-th prime: 
+>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c400212, next timer on: 0x1c4f4452
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+scheduler: switching to process Some(2236)
+2236-th prime is: 19753
+scheduler: switching to process Some(0)
+calculating 2237-th prime: 
+scheduler: switching to process Some(2237)
+2237-th prime is: 19759
+scheduler: switching to process Some(0)
+calculating 2238-th prime: 
+scheduler: switching to process Some(2238)
+2238-th prime is: 19763
+scheduler: switching to process Some(0)
+calculating 2239-th prime: 
+scheduler: switching to process Some(2239)
+2239-th priuser>time: 0x1c4f4aa8, next timer on: 0x1c5e8ce8
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2239)
+me is: 19777
+scheduler: switching to process Some(0)
+calculating 2240-th prime: 
+scheduler: switching to process Some(2240)
+2240-th prime is: 19793
+scheduler: switching to process Some(0)
+calculating 2241-th prime: 
+scheduler: switching to process Some(2241)
+2241-th prime is: 19801
+scheduler: switching to process Some(0)
+calculating 2242-th prime: 
+scheduler: switching to process Some(2242)
+2242-th prime is: 19813
+scheduler: switching to process Some(0)
+calculating 2243-th prime: 
+scheduler: switching to process Some(2243)
+2243-th prime is: 19>TRAP Some(2243) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c5ea847, next timer on: 0x1c6dea87
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2243)
+819
+scheduler: switching to process Some(0)
+calculating 2244-th prime: 
+scheduler: switching to process Some(2244)
+2244-th prime is: 19841
+scheduler: switching to process Some(0)
+calculating 2245-th prime: 
+scheduler: switching to process Some(2245)
+2245-th prime is: 19843
+scheduler: switching to process Some(0)
+calculating 2246-th prime: 
+scheduler: switching to process Some(2246)
+2246-th prime is: 19853
+scheduler: switching to process Some(0)
+calculating 2247-th prime: 
+scheduler: switching to process Some(2247)
+2247-th prime is: 19861
+scheduler: switching to process Some(0)
+>TRAP Some(0) sepc=0x8021a24c sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c6e12c8, next timer on: 0x1c7d5508
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(0)
+calculating 2248-th prime: 
+scheduler: switching to process Some(2248)
+2248-th prime is: 19867
+scheduler: switching to process Some(0)
+calculating 2249-th prime: 
+scheduler: switching to process Some(2249)
+2249-th prime is: 19889
+scheduler: switching to process Some(0)
+calculating 2250-th prime: 
+scheduler: switching to process Some(2250)
+2250-th prime is: 19891
+scheduler: switching to process Some(0)
+calculating 2251-th prime: 
+scheduler: switching to process Some(2251)
+2251-th prime>TRAP Some(2251) sepc=0x8020ff48 sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c7d7861, next timer on: 0x1c8cbaa1
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2251)
+ is: 19913
+scheduler: switching to process Some(0)
+calculating 2252-th prime: 
+scheduler: switching to process Some(2252)
+2252-th prime is: 19919
+scheduler: switching to process Some(0)
+calculating 2253-th prime: 
+scheduler: switching to process Some(2253)
+2253-th prime is: 19927
+scheduler: switching to process Some(0)
+calculating 2254-th prime: 
+scheduler: switching to process Some(2254)
+2254-th prime is: 19937
+scheduler: switching to process Some(0)
+calculating 2255-th prime: 
+scheduler: switching to process Some(2255)
+>TRAP Some(2255) sepc=0x802174d4 sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c8cdc9e, next timer on: 0x1c9c1ede
+yelding
+interrupt: false
+sched locks 0
+interrupt: false
+sched locks 1
+scheduler: switching to process Some(2255)
+2255-th prime is: 19949
+scheduler: switching to process Some(0)
+calculating 2256-th prime: 
+scheduler: switching to process Some(2256)
+2256-th prime is: 19961
+scheduler: switching to process Some(0)
+calculating 2257-th prime: 
+scheduler: switching to process Some(2257)
+2257-th prime is: 19963
+scheduler: switching to process Some(0)
+calculating 2258-th prime: 
+scheduler: switching to process Some(2258)
+2258-th prime is: 19973
+scheduler: switching to process Some(0)
+calculating 2259-th prime: 
+scheduler: switching to process Some(2259)
+>TRAP Some(2259) sepc=0x80235bcc sstatus=0b10000000000000000110000100100000 scause=0x80000005 stval=0x0
+>time: 0x1c9c39c6, next timer on: 0x1cab7c06
+yelding
+>TRAP Some(2259) sepc=0x8021a1ac sstatus=0b10000000000000000110000100000000 scause=0xf stval=0xffff8004
+Something went wrong. PanicInfo { message: explicit panic, location: Location { file: "src/trap.rs", line: 156, column: 18 }, can_unwind: true, force_no_backtrace: false }

@@ -66,7 +66,7 @@ macro_rules! println {
         $crate::uart::uart_print("\n");
     }};
     ($($arg:tt)*) => {{
-        $crate::uart::uart_print(&alloc::format!("{}", alloc::format!($($arg)*)));
+        $crate::uart::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
     }};
 }
 
@@ -82,7 +82,7 @@ macro_rules! debug {
     ($($arg:tt)*) => {{
         unsafe{
             if $crate::DEBUG {
-                $crate::uart::uart_print(&alloc::format!("{}", alloc::format!($($arg)*)));
+                $crate::uart::uart_print(&alloc::format!("{}\n", alloc::format!($($arg)*)));
             }
         }
     }};

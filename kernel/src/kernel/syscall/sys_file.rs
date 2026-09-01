@@ -1,6 +1,6 @@
 use alloc::string::String;
 
-use crate::{process::Process, uart_print, virtmemory::copy_in_cont};
+use crate::{process::Process, uart::uart_print, virtmemory::copy_in_cont};
 
 
 pub fn sys_write(proc: &mut Process) {

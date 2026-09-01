@@ -10,7 +10,7 @@ use crate::{
     FRAME_ALLOCATOR, HEAP_ALLOCATOR, debug, println,
     process::{Process, trapframe::Trapframe},
     trap::trampoline::_trampoline,
-    uart_print, write_csr,
+    write_csr,
 };
 
 unsafe extern "C" {
@@ -211,7 +211,7 @@ impl Default for PageTable {
 impl Drop for PageTable {
     fn drop(&mut self) {
         debug!("dropping pagetable");
-        // self.free();
+        self.free();
     }
 }
 
@@ -455,6 +455,9 @@ impl Clone for Uvm {
     fn clone(&self) -> Self {
         let mut vm = Uvm::new().unwrap();
 
+        vm.begin = self.begin;
+        vm.size = self.size;
+
         for addr in (USER_START..self.end()).step_by(PAGESIZE) {
             let pte = unsafe { self.pagetable.walk(addr, WalkType::Walk).unwrap().read() };
             let pte = Pte::from(pte);
@@ -476,7 +479,7 @@ impl Clone for Uvm {
 
 impl Drop for Uvm {
     fn drop(&mut self) {
-        // self.free();
+        self.free();
     }
 }
 
@@ -547,7 +550,8 @@ impl Uvm {
                 unsafe { HEAP_ALLOCATOR.dealloc(page as *mut u8, PAGE_LAYOUT) };
                 return Err(());
             }
-            self.size += PAGESIZE
+            self.size += PAGESIZE;
+            debug!("uvm size: 0x{:x}", self.size);
         }
         Ok(())
     }

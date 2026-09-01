@@ -252,7 +252,6 @@ impl Process {
         {
             let lock = IntMutex::new(());
             let guard = lock.lock();
-            println!("kexit start {}", interrupt_read());
             // giveup childer to init
             KERNEL.get().unwrap().lock().reparent(self.pid);
 
@@ -263,7 +262,6 @@ impl Process {
 
             self.xstatus = xstatus;
             self.state = ProcState::Zombie;
-            println!("kexit end");
             drop(guard);
         }
 
@@ -432,8 +430,6 @@ unsafe fn sched(context: &mut Context) {
 pub fn scheduler() -> ! {
     loop {
         print!("scheduler: ");
-        print!("interrupt: {}", interrupt_read());
-        unsafe { println!("sched locks {}", (crate::CPU).interrupt_off_stack) };
 
         let mut found = ptr::null_mut();
         unsafe {
@@ -455,7 +451,6 @@ pub fn scheduler() -> ! {
                     proc.state = ProcState::Running;
                     found = proc as *mut Process;
 
-
                     break;
                 }
                 unsafe { proc.lock.unlock_manual() };
@@ -468,11 +463,6 @@ pub fn scheduler() -> ! {
                 crate::CPU.current = found;
                 println!("switching to process {:?}", (*found).pid);
                 switch(&mut crate::CPU.context, &mut (*found).context);
-                println!(
-                    "back traps: {} depth: ",
-                    interrupt_read(),
-                    // crate::CPU.interrupt_off_stack
-                );
                 crate::CPU.current = ptr::null_mut();
                 (*found).lock.unlock_manual();
             }

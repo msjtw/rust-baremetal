@@ -5,12 +5,12 @@ use crate::{
 };
 
 pub fn sys_fork(proc: &mut Process) {
-    println!("fork");
+    debug!("fork");
     proc.kfork().unwrap();
 }
 
 pub fn sys_exec(proc: &mut Process) {
-    println!("exec");
+    debug!("exec");
     let path_addr = proc.trapframe.a0;
     let mut argv_addr = proc.trapframe.a1;
 
@@ -34,14 +34,14 @@ pub fn sys_exec(proc: &mut Process) {
 }
 
 pub fn sys_wait(proc: &mut Process) {
-    println!("wait");
+    debug!("wait");
     let status_addr = proc.trapframe.a0;
     let ret = proc.kwait(status_addr);
     proc.trapframe.a0 = ret as usize;
 }
 
 pub fn sys_exit(proc: &mut Process) {
-    println!("exit");
+    debug!("exit");
     let status_addr = proc.trapframe.a0;
     let xstatus = proc.trapframe.a0;
     proc.kexit(xstatus as u32);
